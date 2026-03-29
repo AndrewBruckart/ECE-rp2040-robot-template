@@ -1,0 +1,4 @@
+.build/
+.arduino15/
+__pycache__/
+*.pyc
