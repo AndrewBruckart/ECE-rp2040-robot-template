@@ -8,6 +8,7 @@
 #define OLED_HEIGHT 64
 
 static Adafruit_SSD1306 display(OLED_WIDTH, OLED_HEIGHT, &Wire);
+static bool oledReady = false;
 
 static void drawSelectedRow(int y, const char *label, bool selected) {
   if (selected) {
@@ -98,7 +99,11 @@ void initUI() {
 
   Wire.setSDA(OLED_SDA);
   Wire.setSCL(OLED_SCL);
-  display.begin(SSD1306_SWITCHCAPVCC, OLED_ADDR);
+  oledReady = display.begin(SSD1306_SWITCHCAPVCC, OLED_ADDR);
+  if (!oledReady) {
+    Serial.println("OLED init failed");
+    return;
+  }
   display.clearDisplay();
   display.setTextColor(SSD1306_WHITE);
   display.setTextSize(1);
@@ -106,6 +111,9 @@ void initUI() {
 }
 
 void drawHomeScreen(int selectedIndex) {
+  if (!oledReady) {
+    return;
+  }
   static const char *items[] = {
     "1. Display Sensors",
     "2. Tune Motors/Servo",
@@ -124,6 +132,9 @@ void drawHomeScreen(int selectedIndex) {
 }
 
 void drawSensorsScreen(int irL, int irC, int irR, int ldr, int ax, int ay, int az, bool accelReady) {
+  if (!oledReady) {
+    return;
+  }
   display.clearDisplay();
   display.setTextSize(1);
   display.setCursor(0, 0);
@@ -184,6 +195,9 @@ void drawSensorsScreen(int irL, int irC, int irR, int ldr, int ax, int ay, int a
 }
 
 void drawTuneScreen(int servoAngle, int motorPercent, bool servoSelected, bool motorRunning) {
+  if (!oledReady) {
+    return;
+  }
   display.clearDisplay();
   display.setTextSize(1);
   display.setCursor(0, 0);
@@ -198,6 +212,9 @@ void drawTuneScreen(int servoAngle, int motorPercent, bool servoSelected, bool m
 }
 
 void drawOutputsScreen(const char *label, bool outputOn, int index, int count) {
+  if (!oledReady) {
+    return;
+  }
   display.clearDisplay();
   display.setTextSize(1);
   display.setCursor(0, 0);
@@ -217,6 +234,9 @@ void drawOutputsScreen(const char *label, bool outputOn, int index, int count) {
 }
 
 void drawAboutScreen() {
+  if (!oledReady) {
+    return;
+  }
   display.clearDisplay();
   display.setTextSize(1);
   display.setCursor(0, 0);

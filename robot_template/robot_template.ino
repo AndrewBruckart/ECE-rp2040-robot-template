@@ -123,7 +123,7 @@ static void applyOutputState(int outputId) {
     case OUTPUT_GREEN: digitalWrite(PIN_LED_GREEN, on ? HIGH : LOW); break;
     case OUTPUT_LEFT_TURN: digitalWrite(PIN_LEFT_TURN, on ? HIGH : LOW); break;
     case OUTPUT_RIGHT_TURN: digitalWrite(PIN_RIGHT_TURN, on ? HIGH : LOW); break;
-    case OUTPUT_BRAKE: digitalWrite(PIN_BRAKE_LIGHT, on ? HIGH : LOW); break;
+    case OUTPUT_BRAKE: setBrakeLightOverride(on); break;
     case OUTPUT_SPEAKER:
       if (on) {
         startSpeakerMelody();
@@ -181,7 +181,7 @@ static void startMotorTest() {
 
 static void handleHomeInput(int clicks, PressType press) {
   if (clicks != 0) {
-    homeSelection = constrain(homeSelection + (clicks > 0 ? 1 : -1), 0, HOME_ITEM_COUNT - 1);
+    homeSelection = constrain(homeSelection + clicks, 0, HOME_ITEM_COUNT - 1);
   }
   if (press == PRESS_SHORT) {
     currentScreen = (ScreenId)(homeSelection + 1);
@@ -210,11 +210,10 @@ static void handleTuneInput(int clicks, PressType press) {
     return;
   }
 
-  int delta = clicks > 0 ? 1 : -1;
   if (tuneServoSelected) {
-    setSteeringAngle(getSteeringAngle() + delta);
+    setSteeringAngle(getSteeringAngle() + clicks);
   } else {
-    setMotorSpeedPercent(getMotorSpeedPercent() + delta);
+    setMotorSpeedPercent(getMotorSpeedPercent() + clicks);
   }
 }
 
@@ -228,7 +227,7 @@ static void handleOutputsInput(int clicks, PressType press) {
   }
 
   if (clicks != 0) {
-    outputSelection = constrain(outputSelection + (clicks > 0 ? 1 : -1), 0, OUTPUT_COUNT - 1);
+    outputSelection = constrain(outputSelection + clicks, 0, OUTPUT_COUNT - 1);
   }
 
   if (press == PRESS_SHORT) {
@@ -336,6 +335,8 @@ void setup() {
   pinMode(PIN_BTN_START, INPUT);
   pinMode(PIN_BTN_STOP, INPUT);
   pinMode(PIN_ENC_SW, INPUT);
+  encoderSwitch.lastState = (digitalRead(PIN_ENC_SW) == HIGH);
+  encoderSwitch.pressedAt = millis();
 
   setMotorSpeedPercent(35);
   setSteeringAngle(90);

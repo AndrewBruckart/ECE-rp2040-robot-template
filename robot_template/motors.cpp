@@ -5,8 +5,13 @@ static int8_t lastLeftCmd = 2;
 static int8_t lastRightCmd = 2;
 static int lastSpeedPercent = 0;
 static bool brakeLightOn = false;
+static bool brakeLightOverrideActive = false;
 
 static void setBrakeLight(bool on) {
+  if (brakeLightOverrideActive) {
+    brakeLightOn = on;
+    return;
+  }
   if (brakeLightOn == on) {
     return;
   }
@@ -67,14 +72,14 @@ void setMotorRawRight(int8_t cmd) {
 
 void setMotorSpeedPercent(int percent) {
   lastSpeedPercent = constrain(percent, 0, 100);
-  if (lastLeftCmd > 0) {
+  if (lastLeftCmd == 1) {
     applyForwardPWM(PIN_LEFT_A, PIN_LEFT_B, lastSpeedPercent);
-  } else if (lastLeftCmd < 0) {
+  } else if (lastLeftCmd == -1) {
     applyReversePWM(PIN_LEFT_A, PIN_LEFT_B, lastSpeedPercent);
   }
-  if (lastRightCmd > 0) {
+  if (lastRightCmd == 1) {
     applyForwardPWM(PIN_RIGHT_A, PIN_RIGHT_B, lastSpeedPercent);
-  } else if (lastRightCmd < 0) {
+  } else if (lastRightCmd == -1) {
     applyReversePWM(PIN_RIGHT_A, PIN_RIGHT_B, lastSpeedPercent);
   }
 }
@@ -83,8 +88,19 @@ int getMotorSpeedPercent() {
   return lastSpeedPercent;
 }
 
+bool motorsAreBraking() {
+  return lastLeftCmd == 127 && lastRightCmd == 127;
+}
+
+void setBrakeLightOverride(bool on) {
+  brakeLightOverrideActive = on;
+  digitalWrite(PIN_BRAKE_LIGHT, on ? HIGH : LOW);
+  brakeLightOn = on;
+}
+
 void motorsBrake() {
-  if (lastLeftCmd == 127 && lastRightCmd == 127) {
+  brakeLightOverrideActive = false;
+  if (motorsAreBraking()) {
     setBrakeLight(true);
     return;
   }
@@ -98,6 +114,7 @@ void motorsBrake() {
 }
 
 void motorsCoast() {
+  brakeLightOverrideActive = false;
   digitalWrite(PIN_LEFT_A, LOW);
   digitalWrite(PIN_LEFT_B, LOW);
   digitalWrite(PIN_RIGHT_A, LOW);
