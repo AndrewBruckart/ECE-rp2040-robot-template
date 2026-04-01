@@ -1,0 +1,4 @@
+Adafruit MMA8451 Library
+Adafruit Unified Sensor
+Adafruit GFX Library
+Adafruit SSD1306
