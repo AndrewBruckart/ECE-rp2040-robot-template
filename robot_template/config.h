@@ -41,15 +41,6 @@
 
 #define MAX_STEER_DEG 45
 
-#define ADC_RIGHT_3IN 1905
-#define WALL_TARGET_ADC ADC_RIGHT_3IN
-#define WALL_TOO_CLOSE_DELTA 250
-#define WALL_TOO_FAR_DELTA 250
-#define WALL_WAY_TOO_FAR_ADC 2500
-
-#define FRONT_TOO_CLOSE_ADC 3000
-#define FRONT_CLEARED_ADC 3600
-
-#define WALL_HYSTERESIS_SAMPLES 10
-#define WALL_TURN_HALF_DEG 15
-#define WALL_TURN_HARD_DEG 40
+// Wall-following tuning defaults are now defined as runtime variables in
+// wall_follow.cpp (wfTargetDistance, wfFrontObstThresh, etc.) so they can be
+// adjusted live from the Wall Follow screen.  Calibration tables live there too.

@@ -118,7 +118,7 @@ void drawHomeScreen(int selectedIndex) {
     "1. Display Sensors",
     "2. Tune Motors/Servo",
     "3. Outputs Test",
-    "4. Quick Help"
+    "4. Wall Follow"
   };
 
   display.clearDisplay();
@@ -233,23 +233,77 @@ void drawOutputsScreen(const char *label, bool outputOn, int index, int count) {
   display.display();
 }
 
-void drawAboutScreen() {
+// Draw the Wall Follow setup / tuning screen.
+// Layout (128×64, text size 1 = 6×8 px per glyph):
+//   y= 0  "WallFollow" title + current FSM state name
+//   y= 9  param row 0: Wall side
+//   y=18  param row 1: Front obstacle threshold
+//   y=27  param row 2: Front clear threshold
+//   y=36  param row 3: Target wall distance
+//   y=45  param row 4: Proportional gain Kp
+//   y=54  param row 5: Motor speed
+// The selected row is highlighted (white fill, black text).
+// Short-press encoder cycles through rows; encoder rotation adjusts the value.
+void drawWallFollowScreen(const char *wallName, const char *stateName,
+                          int paramSelect,
+                          float frontDet, float frontClr, float target,
+                          float kp, int speed) {
   if (!oledReady) {
     return;
   }
   display.clearDisplay();
   display.setTextSize(1);
+
+  // ── Title row ─────────────────────────────────────────────────────────────
   display.setCursor(0, 0);
-  display.println("Robot Template");
-  display.setCursor(0, 14);
-  display.println("Up/Down = encoder");
-  display.setCursor(0, 24);
-  display.println("Short = select");
-  display.setCursor(0, 34);
-  display.println("Long = home");
-  display.setCursor(0, 44);
-  display.println("Start = run fwd");
-  display.setCursor(0, 54);
-  display.println("Stop = brake");
+  display.print("WallFollow");
+  display.setCursor(70, 0);
+  display.print(stateName);   // "IDLE  " / "FOLLOW" / "AVOID "
+
+  // ── Parameter rows (9 px tall each) ──────────────────────────────────────
+  char buf[22];
+
+  // Helper lambda-equivalent: draw one highlighted row
+  for (int row = 0; row < 6; ++row) {
+    int y = 9 + row * 9;
+    bool sel = (row == paramSelect);
+
+    if (sel) {
+      display.fillRect(0, y, 128, 9, SSD1306_WHITE);
+      display.setTextColor(SSD1306_BLACK);
+    } else {
+      display.setTextColor(SSD1306_WHITE);
+    }
+
+    display.setCursor(2, y + 1);
+
+    switch (row) {
+      case 0:
+        snprintf(buf, sizeof(buf), "Wall:  %s", wallName);
+        break;
+      case 1:
+        snprintf(buf, sizeof(buf), "FrntDt:%4.1fin", frontDet);
+        break;
+      case 2:
+        snprintf(buf, sizeof(buf), "FrntCl:%4.1fin", frontClr);
+        break;
+      case 3:
+        snprintf(buf, sizeof(buf), "Target:%4.1fin", target);
+        break;
+      case 4:
+        snprintf(buf, sizeof(buf), "Kp:   %5.1f", kp);
+        break;
+      case 5:
+        snprintf(buf, sizeof(buf), "Speed:    %3d%%", speed);
+        break;
+      default:
+        buf[0] = '\0';
+        break;
+    }
+
+    display.print(buf);
+    display.setTextColor(SSD1306_WHITE);
+  }
+
   display.display();
 }

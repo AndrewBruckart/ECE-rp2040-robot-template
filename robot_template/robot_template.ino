@@ -4,6 +4,7 @@
 #include "sensors.h"
 #include "steering.h"
 #include "ui.h"
+#include "wall_follow.h"
 
 enum PressType {
   PRESS_NONE = 0,
@@ -59,6 +60,7 @@ static bool melodyPlaying = false;
 static int melodyIndex = 0;
 static unsigned long nextMelodyAt = 0;
 static OutputAutoTest outputAutoTest = {false, 0, 0, 0};
+static int wfParamSelect = 0;   // selected parameter row on the Wall Follow screen
 
 static PressType updateButton(ButtonTracker &tracker, int pin) {
   bool pressed = digitalRead(pin) == HIGH;
@@ -239,9 +241,55 @@ static void handleOutputsInput(int clicks, PressType press) {
   }
 }
 
-static void handleAboutInput(PressType press) {
+// ── Wall Follow screen input handler ────────────────────────────────────────
+//
+// Encoder rotation adjusts the currently selected parameter:
+//   row 0 – Wall side   (CW = RIGHT, CCW = LEFT)
+//   row 1 – Front obstacle threshold (±0.5 in per click)
+//   row 2 – Front clear threshold    (±0.5 in per click)
+//   row 3 – Target wall distance     (±0.5 in per click)
+//   row 4 – Proportional gain Kp     (±1.0 per click)
+//   row 5 – Motor speed              (±5 % per click)
+//
+// Short press: cycle through parameter rows.
+// Long press:  stop motors and return to home screen.
+//
+static void handleWallFollowInput(int clicks, PressType press) {
   if (press == PRESS_LONG) {
+    stopMotorTest();
+    runWallFollow(false);   // flush state machine to IDLE, clean up LEDs
     currentScreen = SCREEN_HOME;
+    return;
+  }
+
+  if (press == PRESS_SHORT) {
+    wfParamSelect = (wfParamSelect + 1) % 6;
+    return;
+  }
+
+  if (clicks == 0) {
+    return;
+  }
+
+  switch (wfParamSelect) {
+    case 0:   // Wall side – any CW click → RIGHT, any CCW click → LEFT
+      wfWallSide = (clicks > 0) ? WALL_RIGHT : WALL_LEFT;
+      break;
+    case 1:   // Front obstacle detect threshold
+      wfFrontObstThresh = constrain(wfFrontObstThresh + clicks * 0.5f, 0.5f, 20.0f);
+      break;
+    case 2:   // Front clear threshold
+      wfFrontClearThresh = constrain(wfFrontClearThresh + clicks * 0.5f, 0.5f, 20.0f);
+      break;
+    case 3:   // Target wall distance
+      wfTargetDistance = constrain(wfTargetDistance + clicks * 0.5f, 0.5f, 10.0f);
+      break;
+    case 4:   // Proportional gain
+      wfKp = constrain(wfKp + clicks * 1.0f, 1.0f, 60.0f);
+      break;
+    case 5:   // Motor speed (5% increments)
+      wfMotorSpeed = constrain(wfMotorSpeed + clicks * 5, 5, 100);
+      break;
   }
 }
 
@@ -271,8 +319,12 @@ static void updateScreen() {
     case SCREEN_OUTPUTS:
       drawOutputsScreen(outputNameForIndex(outputSelection), outputStates[outputSelection], outputSelection, OUTPUT_COUNT);
       break;
-    case SCREEN_ABOUT:
-      drawAboutScreen();
+    case SCREEN_WALL_FOLLOW:
+      drawWallFollowScreen(
+        wfWallName(), wfStateName(), wfParamSelect,
+        wfFrontObstThresh, wfFrontClearThresh, wfTargetDistance,
+        wfKp, wfMotorSpeed
+      );
       break;
   }
 }
@@ -338,6 +390,7 @@ void setup() {
   encoderSwitch.lastState = (digitalRead(PIN_ENC_SW) == HIGH);
   encoderSwitch.pressedAt = millis();
 
+  initWallFollow();
   setMotorSpeedPercent(35);
   setSteeringAngle(90);
   setAccelDataRate(MMA8451_DATARATE_100_HZ);
@@ -366,20 +419,36 @@ void loop() {
     case SCREEN_OUTPUTS:
       handleOutputsInput(clicks, encoderPress);
       break;
-    case SCREEN_ABOUT:
-      handleAboutInput(encoderPress);
+    case SCREEN_WALL_FOLLOW:
+      handleWallFollowInput(clicks, encoderPress);
       break;
   }
 
   if (currentScreen == SCREEN_TUNE) {
+    // Tune screen: start/stop buttons control motors at the tuned speed
     if (digitalRead(PIN_BTN_START) == HIGH) {
       startMotorTest();
     }
     if (digitalRead(PIN_BTN_STOP) == HIGH) {
       stopMotorTest();
     }
+  } else if (currentScreen == SCREEN_WALL_FOLLOW) {
+    // Wall Follow screen: START sets speed to wfMotorSpeed before driving
+    if (digitalRead(PIN_BTN_START) == HIGH) {
+      setMotorSpeedPercent(wfMotorSpeed);
+      startMotorTest();
+    }
+    if (digitalRead(PIN_BTN_STOP) == HIGH) {
+      stopMotorTest();
+    }
   } else if (motorRunning) {
+    // Any other screen: keep motors stopped
     stopMotorTest();
+  }
+
+  // Run wall-follow FSM (only active on the wall follow screen)
+  if (currentScreen == SCREEN_WALL_FOLLOW) {
+    runWallFollow(motorRunning);
   }
 
   unsigned long now = millis();
