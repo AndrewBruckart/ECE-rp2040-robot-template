@@ -39,17 +39,5 @@
 #define SERVO_MIN_US 1000
 #define SERVO_MAX_US 2000
 
-#define MAX_STEER_DEG 45
-
-#define ADC_RIGHT_3IN 1905
-#define WALL_TARGET_ADC ADC_RIGHT_3IN
-#define WALL_TOO_CLOSE_DELTA 250
-#define WALL_TOO_FAR_DELTA 250
-#define WALL_WAY_TOO_FAR_ADC 2500
-
-#define FRONT_TOO_CLOSE_ADC 3000
-#define FRONT_CLEARED_ADC 3600
-
-#define WALL_HYSTERESIS_SAMPLES 10
-#define WALL_TURN_HALF_DEG 15
-#define WALL_TURN_HARD_DEG 40
+// Wall-follow tuning now lives in wall_follow.cpp so the controller can use
+// calibrated inches instead of hard-coded raw ADC thresholds.

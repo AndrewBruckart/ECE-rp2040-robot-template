@@ -2,3 +2,4 @@
 .arduino15/
 __pycache__/
 *.pyc
+downloaded-logs/

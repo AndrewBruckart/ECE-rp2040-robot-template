@@ -98,6 +98,11 @@ void setBrakeLightOverride(bool on) {
   brakeLightOn = on;
 }
 
+void clearBrakeLightOverride() {
+  brakeLightOverrideActive = false;
+  digitalWrite(PIN_BRAKE_LIGHT, brakeLightOn ? HIGH : LOW);
+}
+
 void motorsBrake() {
   brakeLightOverrideActive = false;
   if (motorsAreBraking()) {

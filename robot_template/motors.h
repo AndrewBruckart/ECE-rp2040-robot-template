@@ -9,5 +9,6 @@ void setMotorSpeedPercent(int percent);
 int getMotorSpeedPercent();
 bool motorsAreBraking();
 void setBrakeLightOverride(bool on);
+void clearBrakeLightOverride();
 void motorsBrake();
 void motorsCoast();

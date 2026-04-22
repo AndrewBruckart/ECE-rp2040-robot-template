@@ -10,6 +10,7 @@ It is meant to be the first project students clone or copy when starting a new r
 - working motor driver setup
 - working steering servo setup
 - working IR and light sensor reads
+- per-sensor IR distance interpolation for wall following
 - working accelerometer reads
 - simple on-board hardware self-tests
 
@@ -29,17 +30,44 @@ It is meant to be the first project students clone or copy when starting a new r
 Shows left, center, and right IR values, the light sensor, and accelerometer values.
 
 2. `Tune Motors/Servo`
-Use the encoder to adjust either steering angle or motor speed.
-- short press toggles between servo and motor percent
-- `START` runs both motors forward
+Use the encoder to navigate `Servo`, `Motor`, and `Drive`.
+- short press edits `Servo` or `Motor`, and toggles `Drive`
+- the `Drive` row can start or stop both motors from the tune menu
+- `START` still runs both motors forward
 - `STOP` brakes the motors
 - long press returns home
 
 3. `Outputs Test`
 Lets you turn LEDs, turn signals, brake light, and speaker on and off.
 
-4. `Quick Help`
-Shows the core operator controls on the OLED.
+4. `Wall Follow`
+Runs wall following with proportional steering on the servo.
+- short press toggles between menu navigation and editing
+- menu items are `Wall`, `Dist`, `Kp`, and `Motor`
+- `START` begins the wall-follow drive using the currently selected values
+- `STOP` brakes the motors
+- long press returns home
+
+5. `Run The Race`
+Waits for the `START` button, then begins the currently defined autonomous race behavior.
+- right now the first two implemented race steps are `Back Out of Garage` and `Friends House`
+- pressing `START` in `Run The Race` or `Steps` waits 1 second before the robot begins moving
+- `Back Out of Garage` backs straight out until both side IR sensors no longer see the garage walls, then backs with full-left steering for 1500 ms
+- `Friends House` then centers steering to 90 degrees, drives forward until the right IR sensor raw reading reaches about 500, and right-follows at 100% speed until the light sensor drops to about 800 and returns to about 2650
+- race mode currently chains `Back Out of Garage` into `Friends House`, then stops there until the next step is implemented
+- `STOP` brakes the motors
+- long press returns home
+
+6. `Steps`
+Lets you scroll through named race steps and run one step at a time.
+- the current step list is `Back Out of Garage`, `Friends House`, `Follow To Tunnel`, `Drive Through Tunnel`, `Drive To Charge`, `Stop At Charge`, and `Back Up Into Church`
+- `Back Out of Garage` is implemented as a custom step:
+  back straight at 100% until both side sensors lose the wall, then back full-left for 1500 ms
+- `Friends House` is implemented as a custom step:
+  center steering to 90 degrees, drive until the right IR sensor raw reading reaches about 500, then right-follow at 100% until the light sensor goes down to about 800 and comes back to about 2650
+- the remaining steps still default to right wall follow for now
+- `STOP` brakes the motors
+- long press returns home
 
 ## Why Use This Template
 

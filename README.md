@@ -31,3 +31,44 @@ Useful setup commands:
 Get-Content .\libraries.txt | ForEach-Object { ./arduino-cli lib install $_ }
 ./arduino-cli compile --fqbn rp2040:rp2040:sparkfun_thingplusrp2040:flash=16777216_8388608 .\robot_template
 ```
+
+## Run Logging
+
+The robot now logs autonomous runs from the existing `Run The Race` and `Steps` screens.
+
+- Log records stay in SRAM while the robot is running, so the main loop does not pause to write flash during the run.
+- A `START` row is recorded when a run begins, state changes are recorded immediately, and a `SAMPLE` row is recorded every 200 ms.
+- When the run stops, the buffered records are written to LittleFS as `/race_0000.csv`, `/race_0001.csv`, and so on.
+- CSV rows include elapsed time, mode, step index, wall-follow state transitions, steering and drive commands, tuning values, IR distance readings, the center IR ADC reading, the light sensor, and accelerometer values.
+
+Serial commands:
+
+```text
+HELP
+LISTLOGS
+DUMPLATEST
+DUMPLOG /race_0000.csv
+LISTFILES
+DUMPFILE /name.txt
+```
+
+`LISTLOGS` and `LISTFILES` return machine-friendly `path=` / `size=` lines. `DUMPLATEST`, `DUMPLOG`, and `DUMPFILE` wrap file contents between `BEGIN FILE ...` and `END FILE ...`, which makes them easy for PowerShell to capture directly into a `.csv` file.
+
+Windows download helper:
+
+```powershell
+.\Download-RaceLog.ps1 -Port COM5
+```
+
+That command asks the robot for `DUMPLATEST` and saves the returned CSV into `.\downloaded-logs\`. You can also fetch a specific file with:
+
+```powershell
+.\Download-RaceLog.ps1 -Port COM5 -RemotePath /race_0003.csv
+```
+
+LittleFS / flash setting:
+
+- Build the sketch with `flash=16777216_8388608` so the 16 MB board keeps at least 8 MB available for LittleFS.
+- In Arduino IDE, set `Tools > Flash Size` to `16MB (Sketch: 8MB, FS: 8MB)`. The board package default is `16MB (no FS)`, which will make logging fail with `ERR FS unavailable`.
+- `robot_template/sketch.yaml` already uses that flash layout as the default FQBN.
+- On a fresh board or after changing flash layouts, the firmware may format LittleFS once on boot before logs become available.
