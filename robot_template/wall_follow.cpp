@@ -33,6 +33,7 @@ static WallFollowTuning tuning = {
 static unsigned long backupUntilMs = 0;
 static unsigned long postBackupTurnUntilMs = 0;
 static bool backupArmed = true;
+static bool backupEnabled = true;
 
 static float clampFloat(float value, float minValue, float maxValue) {
   if (value < minValue) {
@@ -87,6 +88,7 @@ void initWallFollow() {
   backupUntilMs = 0;
   postBackupTurnUntilMs = 0;
   backupArmed = true;
+  backupEnabled = true;
 }
 
 void resetWallFollowController() {
@@ -108,15 +110,19 @@ WallFollowStatus updateWallFollowControl(float leftDistanceInches, float centerD
   float steeringOffset = computeSteeringOffsetDegrees(distanceError);
   int driveCommand = 1;
 
-  if (centerDistanceInches >= FRONT_BACKUP_CLEAR_INCHES) {
+  if (!backupEnabled) {
+    backupUntilMs = 0;
+    postBackupTurnUntilMs = 0;
+    backupArmed = false;
+  } else if (centerDistanceInches >= FRONT_BACKUP_CLEAR_INCHES) {
     backupArmed = true;
   }
 
-  if (now < backupUntilMs) {
+  if (backupEnabled && now < backupUntilMs) {
     currentState = WALL_FOLLOW_STATE_BACKUP;
     steeringOffset = (selectedWall == WALL_SIDE_LEFT) ? -BACKUP_STEER_DEG : BACKUP_STEER_DEG;
     driveCommand = -1;
-  } else if (frontTooClose && backupArmed) {
+  } else if (backupEnabled && frontTooClose && backupArmed) {
     currentState = WALL_FOLLOW_STATE_BACKUP;
     backupUntilMs = now + BACKUP_DURATION_MS;
     postBackupTurnUntilMs = backupUntilMs + POST_BACKUP_TURN_MS;
@@ -146,6 +152,21 @@ WallFollowStatus updateWallFollowControl(float leftDistanceInches, float centerD
   status.steeringAngle = steeringOffsetToAngle(steeringOffset);
   status.driveCommand = driveCommand;
   return status;
+}
+
+void setWallFollowBackupEnabled(bool enabled) {
+  backupEnabled = enabled;
+  if (!backupEnabled) {
+    backupUntilMs = 0;
+    postBackupTurnUntilMs = 0;
+    backupArmed = false;
+  } else {
+    backupArmed = true;
+  }
+}
+
+bool isWallFollowBackupEnabled() {
+  return backupEnabled;
 }
 
 void setWallFollowSide(WallFollowSide side) {

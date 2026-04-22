@@ -23,7 +23,7 @@ static const int FRIENDS_HOUSE_STEP_INDEX = 1;
 
 static const int GARAGE_STEP_SPEED_PERCENT = 100;
 static const int GARAGE_STEP_STRAIGHT_ANGLE = STEERING_STRAIGHT_ANGLE;
-static const int GARAGE_STEP_FULL_LEFT_ANGLE = 0;
+static const int GARAGE_STEP_FULL_LEFT_ANGLE = 10;
 static const unsigned long GARAGE_BACK_OUT_MS = 500;
 static const unsigned long GARAGE_TURN_LEFT_MS = 1400;
 
@@ -182,6 +182,7 @@ void resetRaceStepControl() {
   garageStepPhase = GARAGE_STEP_PHASE_IDLE;
   garagePhaseStartedAtMs = 0;
   friendsHousePhase = FRIENDS_HOUSE_PHASE_IDLE;
+  setWallFollowBackupEnabled(true);
 }
 
 bool raceStepUsesCustomControl(int stepIndex) {
@@ -204,10 +205,12 @@ bool raceStepCoastsOnFinish(int stepIndex) {
 void beginRaceStepControl(int stepIndex) {
   switch (stepIndex) {
     case BACK_OUT_OF_GARAGE_STEP_INDEX:
+      setWallFollowBackupEnabled(true);
       garageStepPhase = GARAGE_STEP_PHASE_BACK_OUT;
       garagePhaseStartedAtMs = millis();
       break;
     case FRIENDS_HOUSE_STEP_INDEX:
+      setWallFollowBackupEnabled(false);
       setWallFollowSide(WALL_SIDE_RIGHT);
       resetWallFollowController();
       friendsHousePhase = FRIENDS_HOUSE_PHASE_FIND_WALL;

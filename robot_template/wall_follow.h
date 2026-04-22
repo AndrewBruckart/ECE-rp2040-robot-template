@@ -58,6 +58,8 @@ void initWallFollow();
 void resetWallFollowController();
 WallFollowStatus updateWallFollowControl(float leftDistanceInches, float centerDistanceInches, float rightDistanceInches, int centerRawAdc);
 
+void setWallFollowBackupEnabled(bool enabled);
+bool isWallFollowBackupEnabled();
 void setWallFollowSide(WallFollowSide side);
 WallFollowSide getWallFollowSide();
 const char *wallFollowSideName(WallFollowSide side);

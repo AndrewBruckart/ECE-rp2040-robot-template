@@ -229,6 +229,7 @@ static bool wallFollowDriveActive() {
 }
 
 static void startWallFollowDrive() {
+  setWallFollowBackupEnabled(true);
   resetWallFollowController();
   lastWallFollowStatus = sampleWallFollowStatus();
   lastAutoTuning = getWallFollowTuning();
