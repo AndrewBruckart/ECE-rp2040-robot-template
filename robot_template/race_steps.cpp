@@ -23,7 +23,8 @@ static const int FRIENDS_HOUSE_STEP_INDEX = 1;
 static const int GARAGE_STEP_SPEED_PERCENT = 100;
 static const int GARAGE_STEP_STRAIGHT_ANGLE = 90;
 static const int GARAGE_STEP_FULL_LEFT_ANGLE = 0;
-static const unsigned long GARAGE_TURN_LEFT_MS = 1500;
+static const unsigned long GARAGE_BACK_OUT_MS = 500;
+static const unsigned long GARAGE_TURN_LEFT_MS = 1400;
 
 static const int FRIENDS_HOUSE_STRAIGHT_ANGLE = 90;
 static const int FRIENDS_HOUSE_RIGHT_WALL_ADC_START = 500;
@@ -69,11 +70,9 @@ static RaceStepControl serviceBackOutOfGarage() {
 
   WallFollowStatus status = sampleStatusForSide(WALL_SIDE_LEFT);
   unsigned long now = millis();
-  float noWallDistance = wallFollowNoWallDistanceInches();
 
   if (garageStepPhase == GARAGE_STEP_PHASE_BACK_OUT &&
-      status.leftDistanceInches >= noWallDistance &&
-      status.rightDistanceInches >= noWallDistance) {
+      now - garagePhaseStartedAtMs >= GARAGE_BACK_OUT_MS) {
     garageStepPhase = GARAGE_STEP_PHASE_TURN_LEFT;
     garagePhaseStartedAtMs = now;
   }
