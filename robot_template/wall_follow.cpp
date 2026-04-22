@@ -1,15 +1,15 @@
 #include "wall_follow.h"
+#include "config.h"
 #include <Arduino.h>
 #include <math.h>
 
-static const int STRAIGHT_STEERING_ANGLE = 90;
+static const int STRAIGHT_STEERING_ANGLE = STEERING_STRAIGHT_ANGLE;
 static const int WALL_FOLLOW_SERVO_LIMIT_DEG = 55;
 static const float NO_WALL_DISTANCE_INCHES = 14.0f;
 static const float FRONT_TURN_DETECT_INCHES = 7.5f;
 static const float FRONT_BACKUP_DETECT_INCHES = 4.5f;
 static const float FRONT_BACKUP_CLEAR_INCHES = 4.75f;
 static const int NO_WALL_LEFT_STEERING_ANGLE = 50;
-static const int NO_WALL_RIGHT_STEERING_ANGLE = 130;
 static const int FRONT_TURN_STEER_DEG = 38;
 static const int BACKUP_STEER_DEG = 50;
 static const unsigned long BACKUP_DURATION_MS = 260;
@@ -67,8 +67,11 @@ static int steeringOffsetToAngle(float steeringOffsetDegrees) {
 }
 
 static float noWallSeekOffsetDegrees() {
-  int targetAngle = (selectedWall == WALL_SIDE_LEFT) ? NO_WALL_LEFT_STEERING_ANGLE : NO_WALL_RIGHT_STEERING_ANGLE;
-  return (float)(targetAngle - STRAIGHT_STEERING_ANGLE);
+  if (selectedWall == WALL_SIDE_RIGHT) {
+    return 0.0f;
+  }
+
+  return (float)(NO_WALL_LEFT_STEERING_ANGLE - STRAIGHT_STEERING_ANGLE);
 }
 
 float wallFollowNoWallDistanceInches() {

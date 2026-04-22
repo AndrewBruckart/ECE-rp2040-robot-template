@@ -38,6 +38,7 @@
 #define SERVO_CENTER_TRIM_US 30
 #define SERVO_MIN_US 1000
 #define SERVO_MAX_US 2000
+#define STEERING_STRAIGHT_ANGLE 80
 
 // Wall-follow tuning now lives in wall_follow.cpp so the controller can use
 // calibrated inches instead of hard-coded raw ADC thresholds.

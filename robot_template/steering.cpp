@@ -4,7 +4,7 @@
 
 static Servo steer;
 static int steeringTrimUs = SERVO_CENTER_TRIM_US;
-static int steeringAngle = 90;
+static int steeringAngle = STEERING_STRAIGHT_ANGLE;
 static int lastCommandedUs = -1;
 
 static void ensureAttachedOnce() {
@@ -23,7 +23,7 @@ static int angleToUs(int angle) {
 
 void initSteering() {
   steer.attach(PIN_STEER_SERVO);
-  setSteeringAngle(90);
+  setSteeringAngle(STEERING_STRAIGHT_ANGLE);
 }
 
 void setSteeringUs(int us) {
@@ -37,7 +37,7 @@ void setSteeringUs(int us) {
 }
 
 void centerSteering() {
-  setSteeringAngle(90);
+  setSteeringAngle(STEERING_STRAIGHT_ANGLE);
 }
 
 void setSteeringAngle(int angle) {

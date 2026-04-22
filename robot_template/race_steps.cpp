@@ -1,3 +1,4 @@
+#include "config.h"
 #include "race_steps.h"
 #include "sensors.h"
 #include <Arduino.h>
@@ -21,13 +22,13 @@ static const int BACK_OUT_OF_GARAGE_STEP_INDEX = 0;
 static const int FRIENDS_HOUSE_STEP_INDEX = 1;
 
 static const int GARAGE_STEP_SPEED_PERCENT = 100;
-static const int GARAGE_STEP_STRAIGHT_ANGLE = 90;
+static const int GARAGE_STEP_STRAIGHT_ANGLE = STEERING_STRAIGHT_ANGLE;
 static const int GARAGE_STEP_FULL_LEFT_ANGLE = 0;
 static const unsigned long GARAGE_BACK_OUT_MS = 500;
 static const unsigned long GARAGE_TURN_LEFT_MS = 1400;
 
-static const int FRIENDS_HOUSE_STRAIGHT_ANGLE = 90;
-static const int FRIENDS_HOUSE_RIGHT_WALL_ADC_START = 500;
+static const int FRIENDS_HOUSE_STRAIGHT_ANGLE = STEERING_STRAIGHT_ANGLE;
+static const float FRIENDS_HOUSE_RIGHT_WALL_START_INCHES = 4.0f;
 static const int FRIENDS_HOUSE_LOW_LIGHT_LDR = 800;
 static const int FRIENDS_HOUSE_AMBIENT_LDR = 2650;
 
@@ -46,7 +47,7 @@ static WallFollowStatus sampleStatusForSide(WallFollowSide side) {
   status.activeWallDistanceInches = (side == WALL_SIDE_RIGHT) ? status.rightDistanceInches : status.leftDistanceInches;
   status.wallErrorInches = 0.0f;
   status.controlOutputDegrees = 0.0f;
-  status.steeringAngle = 90;
+  status.steeringAngle = STEERING_STRAIGHT_ANGLE;
   status.driveCommand = 0;
   return status;
 }
@@ -120,11 +121,10 @@ static RaceStepControl serviceFriendsHouse() {
   control.tuning = friendsHouseTuning();
 
   int currentLdr = readLDR();
-  int rightRaw = readIRRight();
   WallFollowStatus status = sampleStatusForSide(WALL_SIDE_RIGHT);
 
   if (friendsHousePhase == FRIENDS_HOUSE_PHASE_FIND_WALL &&
-      rightRaw <= FRIENDS_HOUSE_RIGHT_WALL_ADC_START) {
+      status.rightDistanceInches <= FRIENDS_HOUSE_RIGHT_WALL_START_INCHES) {
     friendsHousePhase = FRIENDS_HOUSE_PHASE_FOLLOW_WALL;
     resetWallFollowController();
   }
@@ -149,8 +149,8 @@ static RaceStepControl serviceFriendsHouse() {
       status.state = WALL_FOLLOW_STATE_FRIENDS_FIND_WALL;
       status.selectedWall = WALL_SIDE_RIGHT;
       status.activeWallDistanceInches = status.rightDistanceInches;
-      status.wallErrorInches = (float)(rightRaw - FRIENDS_HOUSE_RIGHT_WALL_ADC_START);
-      status.controlOutputDegrees = (float)(FRIENDS_HOUSE_STRAIGHT_ANGLE - 90);
+      status.wallErrorInches = status.rightDistanceInches - FRIENDS_HOUSE_RIGHT_WALL_START_INCHES;
+      status.controlOutputDegrees = 0.0f;
       status.steeringAngle = FRIENDS_HOUSE_STRAIGHT_ANGLE;
       status.driveCommand = 1;
       break;

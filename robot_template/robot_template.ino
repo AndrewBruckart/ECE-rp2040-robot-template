@@ -734,7 +734,7 @@ void setup() {
   encoderSwitch.pressedAt = millis();
 
   setMotorSpeedPercent(35);
-  setSteeringAngle(90);
+  centerSteering();
   setAccelDataRate(MMA8451_DATARATE_100_HZ);
   clearAllOutputs();
   motorsCoast();
