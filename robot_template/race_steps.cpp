@@ -20,13 +20,15 @@ enum FriendsHousePhase {
 
 enum FollowToTunnelPhase {
   FOLLOW_TO_TUNNEL_PHASE_IDLE = 0,
-  FOLLOW_TO_TUNNEL_PHASE_FOLLOW_WALL,
+  FOLLOW_TO_TUNNEL_PHASE_TURN,
+  FOLLOW_TO_TUNNEL_PHASE_FIND_LEFT_WALL,
+  FOLLOW_TO_TUNNEL_PHASE_FOLLOW_LEFT_WALL,
   FOLLOW_TO_TUNNEL_PHASE_COMPLETE
 };
 
 enum DriveThroughTunnelPhase {
   DRIVE_THROUGH_TUNNEL_PHASE_IDLE = 0,
-  DRIVE_THROUGH_TUNNEL_PHASE_DRIVE_STRAIGHT,
+  DRIVE_THROUGH_TUNNEL_PHASE_FOLLOW_RIGHT_WALL,
   DRIVE_THROUGH_TUNNEL_PHASE_COMPLETE
 };
 
@@ -43,20 +45,27 @@ static const unsigned long GARAGE_TURN_LEFT_MS = 1400;
 
 static const int FRIENDS_HOUSE_STRAIGHT_ANGLE = STEERING_STRAIGHT_ANGLE;
 static const float FRIENDS_HOUSE_RIGHT_WALL_START_INCHES = 4.0f;
-static const int FRIENDS_HOUSE_LOW_LIGHT_LDR = 800;
-static const int FRIENDS_HOUSE_AMBIENT_LDR = 2650;
-static const int TUNNEL_STRAIGHT_ANGLE = STEERING_STRAIGHT_ANGLE;
-static const int TUNNEL_STRAIGHT_LOCK_TOLERANCE_DEG = 2;
-static const int TUNNEL_LOW_LIGHT_LDR = 2400;
+static const int FRIENDS_HOUSE_LOW_LIGHT_LDR = 1200;
+static const int FRIENDS_HOUSE_EXIT_DARK_LDR = 2400;
+static const unsigned long FRIENDS_HOUSE_DARK_DWELL_MS = 200;
+static const int FOLLOW_TO_TUNNEL_TURN_ANGLE = 45;
+static const unsigned long FOLLOW_TO_TUNNEL_TURN_MS = 500;
+static const int FOLLOW_TO_TUNNEL_STRAIGHT_ANGLE = 78;
+static const float FOLLOW_TO_TUNNEL_LEFT_WALL_START_INCHES = 8.0f;
+static const int FOLLOW_TO_TUNNEL_LIGHT_DROP_DELTA_LDR = 100;
+static const float TUNNEL_TARGET_DISTANCE_INCHES = 3.0f;
 static const int TUNNEL_AMBIENT_LDR = 2600;
 
 static GarageStepPhase garageStepPhase = GARAGE_STEP_PHASE_IDLE;
 static unsigned long garagePhaseStartedAtMs = 0;
 
 static FriendsHousePhase friendsHousePhase = FRIENDS_HOUSE_PHASE_IDLE;
+static unsigned long friendsHouseDarkDetectedAtMs = 0;
+static bool friendsHouseDarkTimingActive = false;
 static FollowToTunnelPhase followToTunnelPhase = FOLLOW_TO_TUNNEL_PHASE_IDLE;
+static unsigned long followToTunnelPhaseStartedAtMs = 0;
+static int followToTunnelStartLdr = 0;
 static DriveThroughTunnelPhase driveThroughTunnelPhase = DRIVE_THROUGH_TUNNEL_PHASE_IDLE;
-static bool tunnelSawLowLight = false;
 
 static WallFollowStatus sampleStatusForSide(WallFollowSide side) {
   WallFollowStatus status = {};
@@ -86,26 +95,17 @@ static WallFollowTuning friendsHouseTuning() {
 }
 
 static WallFollowTuning tunnelStepTuning() {
-  return getWallFollowTuning();
+  WallFollowTuning tuning = getWallFollowTuning();
+  tuning.targetWallDistanceInches = TUNNEL_TARGET_DISTANCE_INCHES;
+  return tuning;
 }
 
-static bool tunnelWallsPresent(const WallFollowStatus &status) {
-  float noWallDistance = wallFollowNoWallDistanceInches();
-  return status.leftDistanceInches < noWallDistance && status.rightDistanceInches < noWallDistance;
+static int followToTunnelLightDropThreshold() {
+  return max(0, followToTunnelStartLdr - FOLLOW_TO_TUNNEL_LIGHT_DROP_DELTA_LDR);
 }
 
-static bool tunnelStraightLockReached(const WallFollowStatus &status) {
-  return abs(status.steeringAngle - TUNNEL_STRAIGHT_ANGLE) <= TUNNEL_STRAIGHT_LOCK_TOLERANCE_DEG;
-}
-
-static void updateTunnelLightState(int currentLdr) {
-  if (currentLdr <= TUNNEL_LOW_LIGHT_LDR) {
-    tunnelSawLowLight = true;
-  }
-}
-
-static bool tunnelAmbientRecovered(int currentLdr) {
-  return tunnelSawLowLight && currentLdr >= TUNNEL_AMBIENT_LDR;
+static bool followToTunnelLightDropped(int currentLdr) {
+  return currentLdr <= followToTunnelLightDropThreshold();
 }
 
 static RaceStepControl serviceBackOutOfGarage() {
@@ -165,7 +165,28 @@ static RaceStepControl serviceFriendsHouse() {
   control.tuning = friendsHouseTuning();
 
   int currentLdr = readLDR();
+  unsigned long now = millis();
   WallFollowStatus status = sampleStatusForSide(WALL_SIDE_RIGHT);
+
+  if (friendsHousePhase != FRIENDS_HOUSE_PHASE_LOW_LIGHT &&
+      friendsHousePhase != FRIENDS_HOUSE_PHASE_COMPLETE) {
+    if (currentLdr <= FRIENDS_HOUSE_LOW_LIGHT_LDR) {
+      if (!friendsHouseDarkTimingActive) {
+        friendsHouseDarkTimingActive = true;
+        friendsHouseDarkDetectedAtMs = now;
+      } else if (now - friendsHouseDarkDetectedAtMs >= FRIENDS_HOUSE_DARK_DWELL_MS) {
+        friendsHousePhase = FRIENDS_HOUSE_PHASE_LOW_LIGHT;
+      }
+    } else {
+      friendsHouseDarkTimingActive = false;
+      friendsHouseDarkDetectedAtMs = 0;
+    }
+  }
+
+  if (friendsHousePhase == FRIENDS_HOUSE_PHASE_LOW_LIGHT &&
+      currentLdr >= FRIENDS_HOUSE_EXIT_DARK_LDR) {
+    friendsHousePhase = FRIENDS_HOUSE_PHASE_COMPLETE;
+  }
 
   if (friendsHousePhase == FRIENDS_HOUSE_PHASE_FIND_WALL &&
       status.rightDistanceInches <= FRIENDS_HOUSE_RIGHT_WALL_START_INCHES) {
@@ -173,19 +194,13 @@ static RaceStepControl serviceFriendsHouse() {
     resetWallFollowController();
   }
 
-  if (friendsHousePhase == FRIENDS_HOUSE_PHASE_FOLLOW_WALL || friendsHousePhase == FRIENDS_HOUSE_PHASE_LOW_LIGHT) {
+  if (friendsHousePhase == FRIENDS_HOUSE_PHASE_FOLLOW_WALL) {
     status = updateWallFollowControl(
       status.leftDistanceInches,
       status.centerDistanceInches,
       status.rightDistanceInches,
       status.centerRawAdc
     );
-
-    if (friendsHousePhase == FRIENDS_HOUSE_PHASE_FOLLOW_WALL && currentLdr <= FRIENDS_HOUSE_LOW_LIGHT_LDR) {
-      friendsHousePhase = FRIENDS_HOUSE_PHASE_LOW_LIGHT;
-    } else if (friendsHousePhase == FRIENDS_HOUSE_PHASE_LOW_LIGHT && currentLdr >= FRIENDS_HOUSE_AMBIENT_LDR) {
-      friendsHousePhase = FRIENDS_HOUSE_PHASE_COMPLETE;
-    }
   }
 
   switch (friendsHousePhase) {
@@ -203,6 +218,12 @@ static RaceStepControl serviceFriendsHouse() {
       break;
     case FRIENDS_HOUSE_PHASE_LOW_LIGHT:
       status.state = WALL_FOLLOW_STATE_FRIENDS_LOW_LIGHT;
+      status.selectedWall = WALL_SIDE_RIGHT;
+      status.activeWallDistanceInches = status.rightDistanceInches;
+      status.wallErrorInches = 0.0f;
+      status.controlOutputDegrees = 0.0f;
+      status.steeringAngle = FRIENDS_HOUSE_STRAIGHT_ANGLE;
+      status.driveCommand = 1;
       break;
     case FRIENDS_HOUSE_PHASE_COMPLETE:
       status.state = WALL_FOLLOW_STATE_STEP_COMPLETE;
@@ -223,33 +244,67 @@ static RaceStepControl serviceFollowToTunnel() {
   control.handled = true;
   control.tuning = tunnelStepTuning();
 
-  WallFollowStatus status = sampleStatusForSide(WALL_SIDE_RIGHT);
+  WallFollowStatus status = sampleStatusForSide(WALL_SIDE_LEFT);
   int currentLdr = readLDR();
-  updateTunnelLightState(currentLdr);
+  unsigned long now = millis();
 
-  if (followToTunnelPhase == FOLLOW_TO_TUNNEL_PHASE_FOLLOW_WALL) {
+  if (followToTunnelPhase == FOLLOW_TO_TUNNEL_PHASE_TURN &&
+      now - followToTunnelPhaseStartedAtMs >= FOLLOW_TO_TUNNEL_TURN_MS) {
+    followToTunnelPhase = FOLLOW_TO_TUNNEL_PHASE_FIND_LEFT_WALL;
+    followToTunnelPhaseStartedAtMs = now;
+  }
+
+  if (followToTunnelPhase != FOLLOW_TO_TUNNEL_PHASE_IDLE &&
+      followToTunnelPhase != FOLLOW_TO_TUNNEL_PHASE_COMPLETE &&
+      followToTunnelLightDropped(currentLdr)) {
+    followToTunnelPhase = FOLLOW_TO_TUNNEL_PHASE_COMPLETE;
+  }
+
+  if (followToTunnelPhase == FOLLOW_TO_TUNNEL_PHASE_FIND_LEFT_WALL &&
+      status.leftDistanceInches <= FOLLOW_TO_TUNNEL_LEFT_WALL_START_INCHES) {
+    followToTunnelPhase = FOLLOW_TO_TUNNEL_PHASE_FOLLOW_LEFT_WALL;
+    setWallFollowSide(WALL_SIDE_LEFT);
+    resetWallFollowController();
+  }
+
+  if (followToTunnelPhase == FOLLOW_TO_TUNNEL_PHASE_FOLLOW_LEFT_WALL) {
     status = updateWallFollowControl(
       status.leftDistanceInches,
       status.centerDistanceInches,
       status.rightDistanceInches,
       status.centerRawAdc
     );
-
-    if (tunnelWallsPresent(status) && tunnelStraightLockReached(status)) {
-      followToTunnelPhase = FOLLOW_TO_TUNNEL_PHASE_COMPLETE;
-    } else if (tunnelAmbientRecovered(currentLdr)) {
-      followToTunnelPhase = FOLLOW_TO_TUNNEL_PHASE_COMPLETE;
-    }
   }
 
   switch (followToTunnelPhase) {
-    case FOLLOW_TO_TUNNEL_PHASE_FOLLOW_WALL:
+    case FOLLOW_TO_TUNNEL_PHASE_TURN:
+      status.state = WALL_FOLLOW_STATE_TUNNEL_TURN;
+      status.selectedWall = WALL_SIDE_LEFT;
+      status.activeWallDistanceInches = status.leftDistanceInches;
+      status.wallErrorInches = status.leftDistanceInches - wallFollowNoWallDistanceInches();
+      status.controlOutputDegrees = (float)(FOLLOW_TO_TUNNEL_TURN_ANGLE - FOLLOW_TO_TUNNEL_STRAIGHT_ANGLE);
+      status.steeringAngle = FOLLOW_TO_TUNNEL_TURN_ANGLE;
+      status.driveCommand = 1;
+      break;
+    case FOLLOW_TO_TUNNEL_PHASE_FIND_LEFT_WALL:
+      status.state = WALL_FOLLOW_STATE_TUNNEL_FIND_WALL;
+      status.selectedWall = WALL_SIDE_LEFT;
+      status.activeWallDistanceInches = status.leftDistanceInches;
+      status.wallErrorInches = status.leftDistanceInches - FOLLOW_TO_TUNNEL_LEFT_WALL_START_INCHES;
+      status.controlOutputDegrees = 0.0f;
+      status.steeringAngle = FOLLOW_TO_TUNNEL_STRAIGHT_ANGLE;
+      status.driveCommand = 1;
+      break;
+    case FOLLOW_TO_TUNNEL_PHASE_FOLLOW_LEFT_WALL:
       status.state = WALL_FOLLOW_STATE_TUNNEL_FOLLOW;
       break;
     case FOLLOW_TO_TUNNEL_PHASE_COMPLETE:
       status.state = WALL_FOLLOW_STATE_STEP_COMPLETE;
+      status.selectedWall = WALL_SIDE_LEFT;
+      status.activeWallDistanceInches = status.leftDistanceInches;
+      status.wallErrorInches = 0.0f;
       status.controlOutputDegrees = 0.0f;
-      status.steeringAngle = TUNNEL_STRAIGHT_ANGLE;
+      status.steeringAngle = FOLLOW_TO_TUNNEL_STRAIGHT_ANGLE;
       status.driveCommand = 0;
       control.finished = true;
       break;
@@ -269,23 +324,23 @@ static RaceStepControl serviceDriveThroughTunnel() {
 
   WallFollowStatus status = sampleStatusForSide(WALL_SIDE_RIGHT);
   int currentLdr = readLDR();
-  updateTunnelLightState(currentLdr);
 
-  if (driveThroughTunnelPhase == DRIVE_THROUGH_TUNNEL_PHASE_DRIVE_STRAIGHT) {
-    if (tunnelAmbientRecovered(currentLdr)) {
-      driveThroughTunnelPhase = DRIVE_THROUGH_TUNNEL_PHASE_COMPLETE;
-    }
+  if (driveThroughTunnelPhase == DRIVE_THROUGH_TUNNEL_PHASE_FOLLOW_RIGHT_WALL &&
+      currentLdr >= TUNNEL_AMBIENT_LDR) {
+    driveThroughTunnelPhase = DRIVE_THROUGH_TUNNEL_PHASE_COMPLETE;
+  }
+
+  if (driveThroughTunnelPhase == DRIVE_THROUGH_TUNNEL_PHASE_FOLLOW_RIGHT_WALL) {
+    status = updateWallFollowControl(
+      status.leftDistanceInches,
+      status.centerDistanceInches,
+      status.rightDistanceInches,
+      status.centerRawAdc
+    );
   }
 
   switch (driveThroughTunnelPhase) {
-    case DRIVE_THROUGH_TUNNEL_PHASE_DRIVE_STRAIGHT:
-      status.state = WALL_FOLLOW_STATE_TUNNEL_STRAIGHT;
-      status.selectedWall = WALL_SIDE_RIGHT;
-      status.activeWallDistanceInches = status.rightDistanceInches;
-      status.wallErrorInches = 0.0f;
-      status.controlOutputDegrees = 0.0f;
-      status.steeringAngle = TUNNEL_STRAIGHT_ANGLE;
-      status.driveCommand = 1;
+    case DRIVE_THROUGH_TUNNEL_PHASE_FOLLOW_RIGHT_WALL:
       break;
     case DRIVE_THROUGH_TUNNEL_PHASE_COMPLETE:
       status.state = WALL_FOLLOW_STATE_STEP_COMPLETE;
@@ -293,7 +348,7 @@ static RaceStepControl serviceDriveThroughTunnel() {
       status.activeWallDistanceInches = status.rightDistanceInches;
       status.wallErrorInches = 0.0f;
       status.controlOutputDegrees = 0.0f;
-      status.steeringAngle = TUNNEL_STRAIGHT_ANGLE;
+      status.steeringAngle = STEERING_STRAIGHT_ANGLE;
       status.driveCommand = 0;
       control.finished = true;
       break;
@@ -314,9 +369,12 @@ void resetRaceStepControl() {
   garageStepPhase = GARAGE_STEP_PHASE_IDLE;
   garagePhaseStartedAtMs = 0;
   friendsHousePhase = FRIENDS_HOUSE_PHASE_IDLE;
+  friendsHouseDarkDetectedAtMs = 0;
+  friendsHouseDarkTimingActive = false;
   followToTunnelPhase = FOLLOW_TO_TUNNEL_PHASE_IDLE;
+  followToTunnelPhaseStartedAtMs = 0;
+  followToTunnelStartLdr = 0;
   driveThroughTunnelPhase = DRIVE_THROUGH_TUNNEL_PHASE_IDLE;
-  tunnelSawLowLight = false;
   setWallFollowBackupEnabled(true);
 }
 
@@ -356,17 +414,22 @@ void beginRaceStepControl(int stepIndex) {
       setWallFollowSide(WALL_SIDE_RIGHT);
       resetWallFollowController();
       friendsHousePhase = FRIENDS_HOUSE_PHASE_FIND_WALL;
+      friendsHouseDarkDetectedAtMs = 0;
+      friendsHouseDarkTimingActive = false;
       break;
     case FOLLOW_TO_TUNNEL_STEP_INDEX:
       setWallFollowBackupEnabled(true);
-      setWallFollowSide(WALL_SIDE_RIGHT);
+      setWallFollowSide(WALL_SIDE_LEFT);
       resetWallFollowController();
-      followToTunnelPhase = FOLLOW_TO_TUNNEL_PHASE_FOLLOW_WALL;
-      tunnelSawLowLight = false;
+      followToTunnelPhase = FOLLOW_TO_TUNNEL_PHASE_TURN;
+      followToTunnelPhaseStartedAtMs = millis();
+      followToTunnelStartLdr = readLDR();
       break;
     case DRIVE_THROUGH_TUNNEL_STEP_INDEX:
       setWallFollowBackupEnabled(false);
-      driveThroughTunnelPhase = DRIVE_THROUGH_TUNNEL_PHASE_DRIVE_STRAIGHT;
+      setWallFollowSide(WALL_SIDE_RIGHT);
+      resetWallFollowController();
+      driveThroughTunnelPhase = DRIVE_THROUGH_TUNNEL_PHASE_FOLLOW_RIGHT_WALL;
       break;
     default:
       break;

@@ -53,9 +53,9 @@ Waits for the `START` button, then begins the currently defined autonomous race 
 - right now the first four implemented race steps are `Back Out of Garage`, `Friends House`, `Follow To Tunnel`, and `Drive Through Tunnel`
 - pressing `START` in `Run The Race` or `Steps` waits 1 second before the robot begins moving
 - `Back Out of Garage` backs straight for 500 ms, then backs with 10 degree steering for 1400 ms
-- `Friends House` drives straight at 80 degrees until the right wall is about 4 inches away, then right-follows at 100% speed with backup disabled until the light sensor drops to about 800 and returns to about 2650
-- `Follow To Tunnel` right-follows until both tunnel walls are visible and the steering settles to straight
-- `Drive Through Tunnel` then holds 80 degree steering until the light sensor sees tunnel darkness and then ambient light again
+- `Friends House` drives straight at 80 degrees until the right wall is about 4 inches away, then right-follows at 100% speed with backup disabled until the light sensor has been below about 1200 for 200 ms, then drives straight and stops once the light rises back above about 2400
+- `Follow To Tunnel` steers to 45 degrees for 500 ms, then drives straight at 78 degrees until the left wall is within about 8 inches, then left-follows at a 3 inch target distance and ends as soon as the light sensor drops about 100 counts below the ambient reading captured when the step starts
+- `Drive Through Tunnel` starts in right wall follow and stops as soon as the light sensor returns to ambient light
 - race mode currently chains through those four steps, then stops until the next step is implemented
 - `STOP` brakes the motors
 - long press returns home
@@ -66,11 +66,11 @@ Lets you scroll through named race steps and run one step at a time.
 - `Back Out of Garage` is implemented as a custom step:
   back straight for 500 ms, then back with 10 degree steering for 1400 ms
 - `Friends House` is implemented as a custom step:
-  center steering to 80 degrees, drive until the right wall is about 4 inches away, then right-follow at 100% without the backup maneuver until the light sensor goes down to about 800 and comes back to about 2650
+  center steering to 80 degrees, drive until the right wall is about 4 inches away, then right-follow at 100% without the backup maneuver until the light sensor has been below about 1200 for 200 ms, then drive straight and stop once the light rises back above about 2400
 - `Follow To Tunnel` is implemented as a custom step:
-  right-follow until both tunnel walls are visible and the steering is back at 80 degrees
+  steer to 45 degrees for 500 ms, then drive straight at 78 degrees until the left wall is within about 8 inches, then switch to left wall follow with a 3 inch target distance and stop the step as soon as the light drops about 100 counts below the ambient reading captured when the step starts
 - `Drive Through Tunnel` is implemented as a custom step:
-  keep driving straight at 80 degrees once the light sensor drops below about 2400, then finish when it returns to ambient light at about 2600
+  start in right wall follow and finish as soon as the light sensor returns to ambient light at about 2600
 - the remaining steps still default to right wall follow for now
 - `STOP` brakes the motors
 - long press returns home
