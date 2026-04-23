@@ -35,11 +35,6 @@ struct ButtonTracker {
   unsigned long pressedAt;
 };
 
-struct MelodyNote {
-  int freq;
-  int duration;
-};
-
 struct OutputAutoTest {
   bool active;
   int outputIndex;
@@ -56,17 +51,86 @@ static const int HOME_ITEM_COUNT = 6;
 static const int OUTPUT_COUNT = 7;
 static const int TUNE_ITEM_COUNT = 3;
 static const int STEP_COUNT = 7;
-static const MelodyNote SPEAKER_MELODY[] = {
-  {784, 100}, {988, 100}, {1175, 140}, {1568, 180}
+static const int SPEAKER_TEMPO = 114;
+static const int SPEAKER_REST = 0;
+static const int NOTE_A4 = 440;
+static const int NOTE_B4 = 494;
+static const int NOTE_CS5 = 554;
+static const int NOTE_D5 = 587;
+static const int NOTE_E5 = 659;
+static const int NOTE_FS5 = 740;
+static const int NOTE_G5 = 784;
+static const int NOTE_A5 = 880;
+static const int SPEAKER_MELODY[] = {
+  NOTE_D5,-4, NOTE_E5,-4, NOTE_A4,4,
+  NOTE_E5,-4, NOTE_FS5,-4, NOTE_A5,16, NOTE_G5,16, NOTE_FS5,8,
+  NOTE_D5,-4, NOTE_E5,-4, NOTE_A4,2,
+  NOTE_A4,16, NOTE_A4,16, NOTE_B4,16, NOTE_D5,8, NOTE_D5,16,
+  NOTE_D5,-4, NOTE_E5,-4, NOTE_A4,4,
+  NOTE_E5,-4, NOTE_FS5,-4, NOTE_A5,16, NOTE_G5,16, NOTE_FS5,8,
+  NOTE_D5,-4, NOTE_E5,-4, NOTE_A4,2,
+  NOTE_A4,16, NOTE_A4,16, NOTE_B4,16, NOTE_D5,8, NOTE_D5,16,
+  SPEAKER_REST,4, NOTE_B4,8, NOTE_CS5,8, NOTE_D5,8, NOTE_D5,8, NOTE_E5,8, NOTE_CS5,-8,
+  NOTE_B4,16, NOTE_A4,2, SPEAKER_REST,4,
+
+  SPEAKER_REST,8, NOTE_B4,8, NOTE_B4,8, NOTE_CS5,8, NOTE_D5,8, NOTE_B4,4, NOTE_A4,8,
+  NOTE_A5,8, SPEAKER_REST,8, NOTE_A5,8, NOTE_E5,-4, SPEAKER_REST,4,
+  NOTE_B4,8, NOTE_B4,8, NOTE_CS5,8, NOTE_D5,8, NOTE_B4,8, NOTE_D5,8, NOTE_E5,8, SPEAKER_REST,8,
+  SPEAKER_REST,8, NOTE_CS5,8, NOTE_B4,8, NOTE_A4,-4, SPEAKER_REST,4,
+  SPEAKER_REST,8, NOTE_B4,8, NOTE_B4,8, NOTE_CS5,8, NOTE_D5,8, NOTE_B4,8, NOTE_A4,4,
+  NOTE_E5,8, NOTE_E5,8, NOTE_E5,8, NOTE_FS5,8, NOTE_E5,4, SPEAKER_REST,4,
+
+  NOTE_D5,2, NOTE_E5,8, NOTE_FS5,8, NOTE_D5,8,
+  NOTE_E5,8, NOTE_E5,8, NOTE_E5,8, NOTE_FS5,8, NOTE_E5,4, NOTE_A4,4,
+  SPEAKER_REST,2, NOTE_B4,8, NOTE_CS5,8, NOTE_D5,8, NOTE_B4,8,
+  SPEAKER_REST,8, NOTE_E5,8, NOTE_FS5,8, NOTE_E5,-4, NOTE_A4,16, NOTE_B4,16, NOTE_D5,16, NOTE_B4,16,
+  NOTE_FS5,-8, NOTE_FS5,-8, NOTE_E5,-4, NOTE_A4,16, NOTE_B4,16, NOTE_D5,16, NOTE_B4,16,
+
+  NOTE_E5,-8, NOTE_E5,-8, NOTE_D5,-8, NOTE_CS5,16, NOTE_B4,-8, NOTE_A4,16, NOTE_B4,16, NOTE_D5,16, NOTE_B4,16,
+  NOTE_D5,4, NOTE_E5,8, NOTE_CS5,-8, NOTE_B4,16, NOTE_A4,8, NOTE_A4,8, NOTE_A4,8,
+  NOTE_E5,4, NOTE_D5,2, NOTE_A4,16, NOTE_B4,16, NOTE_D5,16, NOTE_B4,16,
+  NOTE_FS5,-8, NOTE_FS5,-8, NOTE_E5,-4, NOTE_A4,16, NOTE_B4,16, NOTE_D5,16, NOTE_B4,16,
+  NOTE_A5,4, NOTE_CS5,8, NOTE_D5,-8, NOTE_CS5,16, NOTE_B4,8, NOTE_A4,16, NOTE_B4,16, NOTE_D5,16, NOTE_B4,16,
+
+  NOTE_D5,4, NOTE_E5,8, NOTE_CS5,-8, NOTE_B4,16, NOTE_A4,4, NOTE_A4,8,
+  NOTE_E5,4, NOTE_D5,2, SPEAKER_REST,4,
+  SPEAKER_REST,8, NOTE_B4,8, NOTE_D5,8, NOTE_B4,8, NOTE_D5,8, NOTE_E5,4, SPEAKER_REST,8,
+  SPEAKER_REST,8, NOTE_CS5,8, NOTE_B4,8, NOTE_A4,-4, SPEAKER_REST,4,
+  SPEAKER_REST,8, NOTE_B4,8, NOTE_B4,8, NOTE_CS5,8, NOTE_D5,8, NOTE_B4,8, NOTE_A4,4,
+  SPEAKER_REST,8, NOTE_A5,8, NOTE_A5,8, NOTE_E5,8, NOTE_FS5,8, NOTE_E5,8, NOTE_D5,8,
+
+  SPEAKER_REST,8, NOTE_A4,8, NOTE_B4,8, NOTE_CS5,8, NOTE_D5,8, NOTE_B4,8,
+  SPEAKER_REST,8, NOTE_CS5,8, NOTE_B4,8, NOTE_A4,-4, SPEAKER_REST,4,
+  NOTE_B4,8, NOTE_B4,8, NOTE_CS5,8, NOTE_D5,8, NOTE_B4,8, NOTE_A4,4, SPEAKER_REST,8,
+  SPEAKER_REST,8, NOTE_E5,8, NOTE_E5,8, NOTE_FS5,4, NOTE_E5,-4,
+  NOTE_D5,2, NOTE_D5,8, NOTE_E5,8, NOTE_FS5,8, NOTE_E5,4,
+  NOTE_E5,8, NOTE_E5,8, NOTE_FS5,8, NOTE_E5,8, NOTE_A4,8, NOTE_A4,4,
+
+  SPEAKER_REST,-4, NOTE_A4,8, NOTE_B4,8, NOTE_CS5,8, NOTE_D5,8, NOTE_B4,8,
+  SPEAKER_REST,8, NOTE_E5,8, NOTE_FS5,8, NOTE_E5,-4, NOTE_A4,16, NOTE_B4,16, NOTE_D5,16, NOTE_B4,16,
+  NOTE_FS5,-8, NOTE_FS5,-8, NOTE_E5,-4, NOTE_A4,16, NOTE_B4,16, NOTE_D5,16, NOTE_B4,16,
+  NOTE_E5,-8, NOTE_E5,-8, NOTE_D5,-8, NOTE_CS5,16, NOTE_B4,8, NOTE_A4,16, NOTE_B4,16, NOTE_D5,16, NOTE_B4,16,
+  NOTE_D5,4, NOTE_E5,8, NOTE_CS5,-8, NOTE_B4,16, NOTE_A4,4, NOTE_A4,8,
+
+  NOTE_E5,4, NOTE_D5,2, NOTE_A4,16, NOTE_B4,16, NOTE_D5,16, NOTE_B4,16,
+  NOTE_FS5,-8, NOTE_FS5,-8, NOTE_E5,-4, NOTE_A4,16, NOTE_B4,16, NOTE_D5,16, NOTE_B4,16,
+  NOTE_A5,4, NOTE_CS5,8, NOTE_D5,-8, NOTE_CS5,16, NOTE_B4,8, NOTE_A4,16, NOTE_B4,16, NOTE_D5,16, NOTE_B4,16,
+  NOTE_D5,4, NOTE_E5,8, NOTE_CS5,-8, NOTE_B4,16, NOTE_A4,4, NOTE_A4,8,
+  NOTE_E5,4, NOTE_D5,2, NOTE_A4,16, NOTE_B4,16, NOTE_D5,16, NOTE_B4,16,
+
+  NOTE_FS5,-8, NOTE_FS5,-8, NOTE_E5,-4, NOTE_A4,16, NOTE_B4,16, NOTE_D5,16, NOTE_B4,16,
+  NOTE_A5,4, NOTE_CS5,8, NOTE_D5,-8, NOTE_CS5,16, NOTE_B4,8, NOTE_A4,16, NOTE_B4,16, NOTE_D5,16, NOTE_B4,16,
+  NOTE_D5,4, NOTE_E5,8, NOTE_CS5,-8, NOTE_B4,16, NOTE_A4,4, NOTE_A4,8,
+  NOTE_E5,4, NOTE_D5,2, SPEAKER_REST,4
 };
 static const char *const STEP_NAMES[STEP_COUNT] = {
   "Back Out of Garage",
   "Friends House",
-  "Follow To Tunnel",
-  "Drive Through Tunnel",
-  "Drive To Charge",
-  "Stop At Charge",
-  "Back Up Into Church"
+  "Exit Tunnel",
+  "WF Right to Church",
+  "2nd Left Wall Trig",
+  "Fwd Past Church",
+  "Back Into Church"
 };
 
 static ScreenId currentScreen = SCREEN_HOME;
@@ -81,6 +145,7 @@ static bool outputStates[OUTPUT_COUNT] = {false, false, false, false, false, fal
 static bool melodyPlaying = false;
 static int melodyIndex = 0;
 static unsigned long nextMelodyAt = 0;
+static int melodyWholeNote = 0;
 static OutputAutoTest outputAutoTest = {false, 0, 0, 0};
 static int wallFollowSelection = 0;
 static bool wallFollowEditing = false;
@@ -139,6 +204,7 @@ static void startSpeakerMelody() {
   melodyPlaying = true;
   melodyIndex = 0;
   nextMelodyAt = 0;
+  melodyWholeNote = (60000 * 4) / SPEAKER_TEMPO;
   outputStates[OUTPUT_SPEAKER] = true;
 }
 
@@ -157,10 +223,23 @@ static void serviceSpeakerMelody() {
     return;
   }
 
-  const MelodyNote &note = SPEAKER_MELODY[melodyIndex];
-  tone(PIN_SPEAKER, note.freq, note.duration);
-  nextMelodyAt = now + note.duration + 30;
-  melodyIndex++;
+  int note = SPEAKER_MELODY[melodyIndex];
+  int divider = SPEAKER_MELODY[melodyIndex + 1];
+  int noteDuration = 0;
+  if (divider > 0) {
+    noteDuration = melodyWholeNote / divider;
+  } else {
+    noteDuration = melodyWholeNote / abs(divider);
+    noteDuration = (int)(noteDuration * 1.5f);
+  }
+
+  if (note == SPEAKER_REST) {
+    noTone(PIN_SPEAKER);
+  } else {
+    tone(PIN_SPEAKER, note, (int)(noteDuration * 0.9f));
+  }
+  nextMelodyAt = now + noteDuration;
+  melodyIndex += 2;
 }
 
 static void applyOutputState(int outputId) {
@@ -338,6 +417,7 @@ static void stopAutoMode() {
 
 static void stopMotorTest(RaceLogStopReason reason = RACE_LOG_STOP_REASON_MODE_CHANGED, bool coast = false) {
   bool autoModeWasActive = activeAutoMode != AUTO_MODE_NONE;
+  AutoMode completedMode = activeAutoMode;
   WallFollowStatus finalStatus = lastWallFollowStatus;
   WallFollowTuning finalTuning = autoModeWasActive ? lastAutoTuning : getWallFollowTuning();
 
@@ -355,6 +435,9 @@ static void stopMotorTest(RaceLogStopReason reason = RACE_LOG_STOP_REASON_MODE_C
   lastWallFollowStatus = sampleWallFollowStatus();
   if (autoModeWasActive) {
     endRaceLog(finalStatus, finalTuning, false, reason);
+    if (reason == RACE_LOG_STOP_REASON_COMPLETE && completedMode == AUTO_MODE_RACE) {
+      startSpeakerMelody();
+    }
   }
 }
 

@@ -32,10 +32,25 @@ enum DriveThroughTunnelPhase {
   DRIVE_THROUGH_TUNNEL_PHASE_COMPLETE
 };
 
+enum AfterTunnelPhase {
+  AFTER_TUNNEL_PHASE_IDLE = 0,
+  AFTER_TUNNEL_PHASE_EXIT_TURN,
+  AFTER_TUNNEL_PHASE_DRIVE_STRAIGHT,
+  AFTER_TUNNEL_PHASE_APPROACH_WALL,
+  AFTER_TUNNEL_PHASE_WALL_FOLLOW,
+  AFTER_TUNNEL_PHASE_FIRST_WF_PAUSE,
+  AFTER_TUNNEL_PHASE_CLOSE_LEFT_WF,
+  AFTER_TUNNEL_PHASE_CHARGE_STOP,
+  AFTER_TUNNEL_PHASE_WALL_FOLLOW_2,
+  AFTER_TUNNEL_PHASE_FINAL_LEFT_WF,
+  AFTER_TUNNEL_PHASE_BACK_INTO_GAP
+};
+
 static const int BACK_OUT_OF_GARAGE_STEP_INDEX = 0;
 static const int FRIENDS_HOUSE_STEP_INDEX = 1;
 static const int FOLLOW_TO_TUNNEL_STEP_INDEX = 2;
 static const int DRIVE_THROUGH_TUNNEL_STEP_INDEX = 3;
+static const int AFTER_TUNNEL_STEP_INDEX = 4;
 
 static const int GARAGE_STEP_SPEED_PERCENT = 100;
 static const int GARAGE_STEP_STRAIGHT_ANGLE = STEERING_STRAIGHT_ANGLE;
@@ -50,11 +65,29 @@ static const int FRIENDS_HOUSE_EXIT_DARK_LDR = 2400;
 static const unsigned long FRIENDS_HOUSE_DARK_DWELL_MS = 200;
 static const int FOLLOW_TO_TUNNEL_TURN_ANGLE = 45;
 static const unsigned long FOLLOW_TO_TUNNEL_TURN_MS = 500;
-static const int FOLLOW_TO_TUNNEL_STRAIGHT_ANGLE = 78;
+static const int FOLLOW_TO_TUNNEL_STRAIGHT_ANGLE = 77;
 static const float FOLLOW_TO_TUNNEL_LEFT_WALL_START_INCHES = 8.0f;
 static const int FOLLOW_TO_TUNNEL_LIGHT_DROP_DELTA_LDR = 100;
 static const float TUNNEL_TARGET_DISTANCE_INCHES = 3.0f;
 static const int TUNNEL_AMBIENT_LDR = 2600;
+
+static const int AFTER_TUNNEL_EXIT_TURN_ANGLE = FOLLOW_TO_TUNNEL_TURN_ANGLE;
+static const unsigned long AFTER_TUNNEL_EXIT_TURN_MS = FOLLOW_TO_TUNNEL_TURN_MS;
+static const int AFTER_TUNNEL_STRAIGHT_ANGLE = 76;
+static const unsigned long AFTER_TUNNEL_STRAIGHT_MS = 1000;
+static const float AFTER_TUNNEL_WALL_DETECT_INCHES = 6.0f;
+static const float AFTER_TUNNEL_LEFT_WALL_DETECT_INCHES = 6.0f;
+static const float AFTER_TUNNEL_LEFT_WALL_LOST_INCHES = 9.0f;
+static const float AFTER_TUNNEL_RIGHT_WALL_CONFIRM_INCHES = 8.0f;
+static const unsigned long AFTER_TUNNEL_LEFT_WALL_SUSTAIN_MS = 750;
+static const unsigned long AFTER_TUNNEL_WALL2_SWAP_SUSTAIN_MS = 200;
+static const unsigned long AFTER_TUNNEL_FIRST_WF_PAUSE_MS = 500;
+static const float AFTER_TUNNEL_CLOSE_LEFT_TARGET_INCHES = 2.5f;
+static const unsigned long AFTER_TUNNEL_CLOSE_LEFT_WF_MS = 2000;
+static const unsigned long AFTER_TUNNEL_CHARGE_STOP_MS = 2000;
+static const float AFTER_TUNNEL_FINAL_LEFT_TARGET_INCHES = 2.5f;
+static const unsigned long AFTER_TUNNEL_BACK_INTO_GAP_MS = 2200;
+static const int AFTER_TUNNEL_BACK_STEER_ANGLE = 160;
 
 static GarageStepPhase garageStepPhase = GARAGE_STEP_PHASE_IDLE;
 static unsigned long garagePhaseStartedAtMs = 0;
@@ -66,6 +99,14 @@ static FollowToTunnelPhase followToTunnelPhase = FOLLOW_TO_TUNNEL_PHASE_IDLE;
 static unsigned long followToTunnelPhaseStartedAtMs = 0;
 static int followToTunnelStartLdr = 0;
 static DriveThroughTunnelPhase driveThroughTunnelPhase = DRIVE_THROUGH_TUNNEL_PHASE_IDLE;
+
+static AfterTunnelPhase afterTunnelPhase = AFTER_TUNNEL_PHASE_IDLE;
+static unsigned long afterTunnelPhaseStartedAtMs = 0;
+static int afterTunnelLeftWallCount = 0;
+static unsigned long afterTunnelLeftWallSeenAtMs = 0;
+static bool afterTunnelLeftWallActive = false;
+static bool afterTunnelWall2Armed = false;
+static WallFollowTuning afterTunnelSavedTuning = {};
 
 static WallFollowStatus sampleStatusForSide(WallFollowSide side) {
   WallFollowStatus status = {};
@@ -97,6 +138,12 @@ static WallFollowTuning friendsHouseTuning() {
 static WallFollowTuning tunnelStepTuning() {
   WallFollowTuning tuning = getWallFollowTuning();
   tuning.targetWallDistanceInches = TUNNEL_TARGET_DISTANCE_INCHES;
+  return tuning;
+}
+
+static WallFollowTuning afterTunnelTuning() {
+  WallFollowTuning tuning = getWallFollowTuning();
+  tuning.motorSpeedPercent = 100;
   return tuning;
 }
 
@@ -361,6 +408,194 @@ static RaceStepControl serviceDriveThroughTunnel() {
   return control;
 }
 
+static RaceStepControl serviceAfterTunnel() {
+  RaceStepControl control = {};
+  control.handled = true;
+  control.tuning = afterTunnelTuning();
+
+  WallFollowStatus status = sampleStatusForSide(WALL_SIDE_RIGHT);
+  unsigned long now = millis();
+
+  if (afterTunnelPhase == AFTER_TUNNEL_PHASE_EXIT_TURN &&
+      now - afterTunnelPhaseStartedAtMs >= AFTER_TUNNEL_EXIT_TURN_MS) {
+    afterTunnelPhase = AFTER_TUNNEL_PHASE_DRIVE_STRAIGHT;
+    afterTunnelPhaseStartedAtMs = now;
+  }
+
+  if (afterTunnelPhase == AFTER_TUNNEL_PHASE_DRIVE_STRAIGHT &&
+      now - afterTunnelPhaseStartedAtMs >= AFTER_TUNNEL_STRAIGHT_MS) {
+    afterTunnelPhase = AFTER_TUNNEL_PHASE_APPROACH_WALL;
+  }
+
+  if (afterTunnelPhase == AFTER_TUNNEL_PHASE_APPROACH_WALL &&
+      status.centerDistanceInches <= AFTER_TUNNEL_WALL_DETECT_INCHES) {
+    afterTunnelPhase = AFTER_TUNNEL_PHASE_WALL_FOLLOW;
+    resetWallFollowController();
+  }
+
+  if (afterTunnelPhase == AFTER_TUNNEL_PHASE_FIRST_WF_PAUSE &&
+      now - afterTunnelPhaseStartedAtMs >= AFTER_TUNNEL_FIRST_WF_PAUSE_MS) {
+    afterTunnelSavedTuning = getWallFollowTuning();
+    afterTunnelPhase = AFTER_TUNNEL_PHASE_CLOSE_LEFT_WF;
+    afterTunnelPhaseStartedAtMs = now;
+    setWallFollowSide(WALL_SIDE_LEFT);
+    setWallFollowTargetDistance(AFTER_TUNNEL_CLOSE_LEFT_TARGET_INCHES);
+    resetWallFollowController();
+  }
+
+  if (afterTunnelPhase == AFTER_TUNNEL_PHASE_CLOSE_LEFT_WF &&
+      now - afterTunnelPhaseStartedAtMs >= AFTER_TUNNEL_CLOSE_LEFT_WF_MS) {
+    afterTunnelPhase = AFTER_TUNNEL_PHASE_CHARGE_STOP;
+    afterTunnelPhaseStartedAtMs = now;
+    setWallFollowTargetDistance(afterTunnelSavedTuning.targetWallDistanceInches);
+  }
+
+  if (afterTunnelPhase == AFTER_TUNNEL_PHASE_CHARGE_STOP &&
+      now - afterTunnelPhaseStartedAtMs >= AFTER_TUNNEL_CHARGE_STOP_MS) {
+    afterTunnelPhase = AFTER_TUNNEL_PHASE_WALL_FOLLOW_2;
+    setWallFollowSide(WALL_SIDE_RIGHT);
+    resetWallFollowController();
+    afterTunnelLeftWallActive = false;
+    afterTunnelLeftWallSeenAtMs = 0;
+    afterTunnelWall2Armed = false;
+  }
+
+  if (afterTunnelPhase == AFTER_TUNNEL_PHASE_FINAL_LEFT_WF &&
+      status.leftDistanceInches >= AFTER_TUNNEL_LEFT_WALL_LOST_INCHES) {
+    afterTunnelPhase = AFTER_TUNNEL_PHASE_BACK_INTO_GAP;
+    afterTunnelPhaseStartedAtMs = now;
+    setWallFollowTargetDistance(afterTunnelSavedTuning.targetWallDistanceInches);
+  }
+
+  bool isWfPhase = afterTunnelPhase == AFTER_TUNNEL_PHASE_WALL_FOLLOW ||
+                   afterTunnelPhase == AFTER_TUNNEL_PHASE_FIRST_WF_PAUSE ||
+                   afterTunnelPhase == AFTER_TUNNEL_PHASE_CLOSE_LEFT_WF ||
+                   afterTunnelPhase == AFTER_TUNNEL_PHASE_WALL_FOLLOW_2 ||
+                   afterTunnelPhase == AFTER_TUNNEL_PHASE_FINAL_LEFT_WF;
+
+  if (isWfPhase) {
+    status = updateWallFollowControl(
+      status.leftDistanceInches,
+      status.centerDistanceInches,
+      status.rightDistanceInches,
+      status.centerRawAdc
+    );
+  }
+
+  bool isRightWfPhase = afterTunnelPhase == AFTER_TUNNEL_PHASE_WALL_FOLLOW ||
+                        afterTunnelPhase == AFTER_TUNNEL_PHASE_WALL_FOLLOW_2;
+
+  if (isRightWfPhase) {
+    if (afterTunnelPhase == AFTER_TUNNEL_PHASE_WALL_FOLLOW_2 && !afterTunnelWall2Armed) {
+      if (status.leftDistanceInches >= AFTER_TUNNEL_LEFT_WALL_LOST_INCHES) {
+        afterTunnelWall2Armed = true;
+        afterTunnelLeftWallSeenAtMs = 0;
+      }
+    }
+
+    bool canDetect = (afterTunnelPhase == AFTER_TUNNEL_PHASE_WALL_FOLLOW) ||
+                     (afterTunnelPhase == AFTER_TUNNEL_PHASE_WALL_FOLLOW_2 && afterTunnelWall2Armed);
+
+    if (canDetect) {
+      if (!afterTunnelLeftWallActive) {
+        bool firstTriggerDetected = status.leftDistanceInches <= AFTER_TUNNEL_LEFT_WALL_DETECT_INCHES &&
+                                    status.rightDistanceInches <= AFTER_TUNNEL_RIGHT_WALL_CONFIRM_INCHES;
+        bool secondTriggerDetected = status.leftDistanceInches <= AFTER_TUNNEL_LEFT_WALL_DETECT_INCHES;
+        bool triggerDetected = (afterTunnelLeftWallCount == 0) ? firstTriggerDetected : secondTriggerDetected;
+
+        if (triggerDetected) {
+          if (afterTunnelLeftWallSeenAtMs == 0) {
+            afterTunnelLeftWallSeenAtMs = now;
+          } else if (now - afterTunnelLeftWallSeenAtMs >=
+                     ((afterTunnelLeftWallCount == 0) ? AFTER_TUNNEL_LEFT_WALL_SUSTAIN_MS
+                                                      : AFTER_TUNNEL_WALL2_SWAP_SUSTAIN_MS)) {
+            afterTunnelLeftWallActive = true;
+            afterTunnelLeftWallCount++;
+            if (afterTunnelLeftWallCount == 1) {
+              afterTunnelPhase = AFTER_TUNNEL_PHASE_FIRST_WF_PAUSE;
+              afterTunnelPhaseStartedAtMs = now;
+            } else {
+              afterTunnelPhase = AFTER_TUNNEL_PHASE_FINAL_LEFT_WF;
+              afterTunnelPhaseStartedAtMs = now;
+              setWallFollowSide(WALL_SIDE_LEFT);
+              setWallFollowTargetDistance(AFTER_TUNNEL_FINAL_LEFT_TARGET_INCHES);
+              resetWallFollowController();
+            }
+          }
+        } else {
+          afterTunnelLeftWallSeenAtMs = 0;
+        }
+      } else if (status.leftDistanceInches >= AFTER_TUNNEL_LEFT_WALL_LOST_INCHES) {
+        afterTunnelLeftWallActive = false;
+        afterTunnelLeftWallSeenAtMs = 0;
+      }
+    }
+  }
+
+  switch (afterTunnelPhase) {
+    case AFTER_TUNNEL_PHASE_EXIT_TURN:
+      status.state = WALL_FOLLOW_STATE_AFTER_TUNNEL_EXIT_TURN;
+      status.wallErrorInches = 0.0f;
+      status.controlOutputDegrees = (float)(AFTER_TUNNEL_EXIT_TURN_ANGLE - AFTER_TUNNEL_STRAIGHT_ANGLE);
+      status.steeringAngle = AFTER_TUNNEL_EXIT_TURN_ANGLE;
+      status.driveCommand = 1;
+      break;
+    case AFTER_TUNNEL_PHASE_DRIVE_STRAIGHT:
+      status.state = WALL_FOLLOW_STATE_AFTER_TUNNEL_STRAIGHT;
+      status.wallErrorInches = 0.0f;
+      status.controlOutputDegrees = 0.0f;
+      status.steeringAngle = AFTER_TUNNEL_STRAIGHT_ANGLE;
+      status.driveCommand = 1;
+      break;
+    case AFTER_TUNNEL_PHASE_APPROACH_WALL:
+      status.state = WALL_FOLLOW_STATE_AFTER_TUNNEL_APPROACH;
+      status.wallErrorInches = 0.0f;
+      status.controlOutputDegrees = 0.0f;
+      status.steeringAngle = AFTER_TUNNEL_STRAIGHT_ANGLE;
+      status.driveCommand = 1;
+      break;
+    case AFTER_TUNNEL_PHASE_WALL_FOLLOW:
+      status.state = WALL_FOLLOW_STATE_AFTER_TUNNEL_FOLLOW;
+      break;
+    case AFTER_TUNNEL_PHASE_FIRST_WF_PAUSE:
+      status.state = WALL_FOLLOW_STATE_AFTER_TUNNEL_FIRST_PAUSE;
+      break;
+    case AFTER_TUNNEL_PHASE_CLOSE_LEFT_WF:
+      status.state = WALL_FOLLOW_STATE_AFTER_TUNNEL_CLOSE_LEFT;
+      break;
+    case AFTER_TUNNEL_PHASE_CHARGE_STOP:
+      status.state = WALL_FOLLOW_STATE_AFTER_TUNNEL_CHARGE_STOP;
+      status.wallErrorInches = 0.0f;
+      status.controlOutputDegrees = 0.0f;
+      status.steeringAngle = AFTER_TUNNEL_STRAIGHT_ANGLE;
+      status.driveCommand = 0;
+      break;
+    case AFTER_TUNNEL_PHASE_WALL_FOLLOW_2:
+      status.state = WALL_FOLLOW_STATE_AFTER_TUNNEL_WF2;
+      break;
+    case AFTER_TUNNEL_PHASE_FINAL_LEFT_WF:
+      status.state = WALL_FOLLOW_STATE_AFTER_TUNNEL_FINAL_LEFT;
+      break;
+    case AFTER_TUNNEL_PHASE_BACK_INTO_GAP:
+      status.state = WALL_FOLLOW_STATE_AFTER_TUNNEL_BACK;
+      status.wallErrorInches = 0.0f;
+      status.controlOutputDegrees = (float)(AFTER_TUNNEL_BACK_STEER_ANGLE - AFTER_TUNNEL_STRAIGHT_ANGLE);
+      status.steeringAngle = AFTER_TUNNEL_BACK_STEER_ANGLE;
+      status.driveCommand = -1;
+      if (now - afterTunnelPhaseStartedAtMs >= AFTER_TUNNEL_BACK_INTO_GAP_MS) {
+        status.driveCommand = 0;
+        control.finished = true;
+      }
+      break;
+    case AFTER_TUNNEL_PHASE_IDLE:
+    default:
+      break;
+  }
+
+  control.status = status;
+  return control;
+}
+
 void initRaceSteps() {
   resetRaceStepControl();
 }
@@ -375,14 +610,22 @@ void resetRaceStepControl() {
   followToTunnelPhaseStartedAtMs = 0;
   followToTunnelStartLdr = 0;
   driveThroughTunnelPhase = DRIVE_THROUGH_TUNNEL_PHASE_IDLE;
+  afterTunnelPhase = AFTER_TUNNEL_PHASE_IDLE;
+  afterTunnelPhaseStartedAtMs = 0;
+  afterTunnelLeftWallCount = 0;
+  afterTunnelLeftWallSeenAtMs = 0;
+  afterTunnelLeftWallActive = false;
+  afterTunnelWall2Armed = false;
+  afterTunnelSavedTuning = WallFollowTuning();
   setWallFollowBackupEnabled(true);
 }
 
 bool raceStepUsesCustomControl(int stepIndex) {
   return stepIndex == BACK_OUT_OF_GARAGE_STEP_INDEX ||
-    stepIndex == FRIENDS_HOUSE_STEP_INDEX ||
-    stepIndex == FOLLOW_TO_TUNNEL_STEP_INDEX ||
-    stepIndex == DRIVE_THROUGH_TUNNEL_STEP_INDEX;
+         stepIndex == FRIENDS_HOUSE_STEP_INDEX ||
+         stepIndex == FOLLOW_TO_TUNNEL_STEP_INDEX ||
+         stepIndex == DRIVE_THROUGH_TUNNEL_STEP_INDEX ||
+         stepIndex == AFTER_TUNNEL_STEP_INDEX;
 }
 
 int nextImplementedRaceStepIndex(int stepIndex) {
@@ -393,6 +636,8 @@ int nextImplementedRaceStepIndex(int stepIndex) {
       return FOLLOW_TO_TUNNEL_STEP_INDEX;
     case FOLLOW_TO_TUNNEL_STEP_INDEX:
       return DRIVE_THROUGH_TUNNEL_STEP_INDEX;
+    case DRIVE_THROUGH_TUNNEL_STEP_INDEX:
+      return AFTER_TUNNEL_STEP_INDEX;
     default:
       return -1;
   }
@@ -431,6 +676,18 @@ void beginRaceStepControl(int stepIndex) {
       resetWallFollowController();
       driveThroughTunnelPhase = DRIVE_THROUGH_TUNNEL_PHASE_FOLLOW_RIGHT_WALL;
       break;
+    case AFTER_TUNNEL_STEP_INDEX:
+      setWallFollowBackupEnabled(true);
+      setWallFollowSide(WALL_SIDE_RIGHT);
+      resetWallFollowController();
+      afterTunnelPhase = AFTER_TUNNEL_PHASE_EXIT_TURN;
+      afterTunnelPhaseStartedAtMs = millis();
+      afterTunnelLeftWallCount = 0;
+      afterTunnelLeftWallSeenAtMs = 0;
+      afterTunnelLeftWallActive = false;
+      afterTunnelWall2Armed = false;
+      afterTunnelSavedTuning = getWallFollowTuning();
+      break;
     default:
       break;
   }
@@ -462,6 +719,11 @@ RaceStepControl serviceRaceStepControl(int stepIndex) {
         return RaceStepControl();
       }
       return serviceDriveThroughTunnel();
+    case AFTER_TUNNEL_STEP_INDEX:
+      if (afterTunnelPhase == AFTER_TUNNEL_PHASE_IDLE) {
+        return RaceStepControl();
+      }
+      return serviceAfterTunnel();
     default:
       return RaceStepControl();
   }

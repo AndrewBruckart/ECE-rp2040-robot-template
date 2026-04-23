@@ -62,8 +62,6 @@ static float computeDistanceError(float wallDistanceInches) {
 }
 
 static float computeSteeringOffsetDegrees(float distanceErrorInches) {
-  // On this chassis, positive steering angles turn away from the left wall and
-  // negative steering angles turn away from the right wall.
   float sideGain = (selectedWall == WALL_SIDE_LEFT) ? -1.0f : 1.0f;
   return sideGain * tuning.kp * distanceErrorInches;
 }
@@ -204,6 +202,17 @@ const char *wallFollowStateName(WallFollowState state) {
     case WALL_FOLLOW_STATE_TUNNEL_FIND_WALL: return "TUNNEL_FIND";
     case WALL_FOLLOW_STATE_TUNNEL_FOLLOW: return "TUNNEL_FOLLOW";
     case WALL_FOLLOW_STATE_TUNNEL_STRAIGHT: return "TUNNEL_STRAIGHT";
+    case WALL_FOLLOW_STATE_AFTER_TUNNEL_EXIT_TURN: return "POST_TUN_XIT";
+    case WALL_FOLLOW_STATE_AFTER_TUNNEL_STRAIGHT: return "POST_TUN_STR";
+    case WALL_FOLLOW_STATE_AFTER_TUNNEL_APPROACH: return "POST_TUN_APP";
+    case WALL_FOLLOW_STATE_AFTER_TUNNEL_FOLLOW: return "POST_TUN_WF";
+    case WALL_FOLLOW_STATE_AFTER_TUNNEL_FWD_PAST_GAP: return "POST_TUN_FWD";
+    case WALL_FOLLOW_STATE_AFTER_TUNNEL_BACK: return "POST_TUN_BCK";
+    case WALL_FOLLOW_STATE_AFTER_TUNNEL_FIRST_PAUSE: return "POST_TUN_1WF";
+    case WALL_FOLLOW_STATE_AFTER_TUNNEL_CLOSE_LEFT: return "CLF_CLOSE";
+    case WALL_FOLLOW_STATE_AFTER_TUNNEL_FINAL_LEFT: return "FINAL_LEFT";
+    case WALL_FOLLOW_STATE_AFTER_TUNNEL_CHARGE_STOP: return "CHRG_STOP";
+    case WALL_FOLLOW_STATE_AFTER_TUNNEL_WF2: return "POST_TUN_WF2";
     case WALL_FOLLOW_STATE_TRACKING:
     default:
       return "TRACK";
@@ -213,6 +222,11 @@ const char *wallFollowStateName(WallFollowState state) {
 WallFollowTuning getWallFollowTuning() {
   normalizeTuning();
   return tuning;
+}
+
+void setWallFollowTargetDistance(float distanceInches) {
+  tuning.targetWallDistanceInches = distanceInches;
+  normalizeTuning();
 }
 
 void adjustWallFollowMenuItem(WallFollowMenuItem item, int delta) {
