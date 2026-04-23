@@ -50,11 +50,13 @@ Runs wall following with proportional steering on the servo.
 
 5. `Run The Race`
 Waits for the `START` button, then begins the currently defined autonomous race behavior.
-- right now the first two implemented race steps are `Back Out of Garage` and `Friends House`
+- right now the first four implemented race steps are `Back Out of Garage`, `Friends House`, `Follow To Tunnel`, and `Drive Through Tunnel`
 - pressing `START` in `Run The Race` or `Steps` waits 1 second before the robot begins moving
-- `Back Out of Garage` backs straight out until both side IR sensors no longer see the garage walls, then backs with full-left steering for 1500 ms
-- `Friends House` then centers steering to 90 degrees, drives forward until the right IR sensor raw reading reaches about 500, and right-follows at 100% speed until the light sensor drops to about 800 and returns to about 2650
-- race mode currently chains `Back Out of Garage` into `Friends House`, then stops there until the next step is implemented
+- `Back Out of Garage` backs straight for 500 ms, then backs with 10 degree steering for 1400 ms
+- `Friends House` drives straight at 80 degrees until the right wall is about 4 inches away, then right-follows at 100% speed with backup disabled until the light sensor drops to about 800 and returns to about 2650
+- `Follow To Tunnel` right-follows until both tunnel walls are visible and the steering settles to straight
+- `Drive Through Tunnel` then holds 80 degree steering until the light sensor sees tunnel darkness and then ambient light again
+- race mode currently chains through those four steps, then stops until the next step is implemented
 - `STOP` brakes the motors
 - long press returns home
 
@@ -62,9 +64,13 @@ Waits for the `START` button, then begins the currently defined autonomous race 
 Lets you scroll through named race steps and run one step at a time.
 - the current step list is `Back Out of Garage`, `Friends House`, `Follow To Tunnel`, `Drive Through Tunnel`, `Drive To Charge`, `Stop At Charge`, and `Back Up Into Church`
 - `Back Out of Garage` is implemented as a custom step:
-  back straight at 100% until both side sensors lose the wall, then back full-left for 1500 ms
+  back straight for 500 ms, then back with 10 degree steering for 1400 ms
 - `Friends House` is implemented as a custom step:
-  center steering to 90 degrees, drive until the right IR sensor raw reading reaches about 500, then right-follow at 100% until the light sensor goes down to about 800 and comes back to about 2650
+  center steering to 80 degrees, drive until the right wall is about 4 inches away, then right-follow at 100% without the backup maneuver until the light sensor goes down to about 800 and comes back to about 2650
+- `Follow To Tunnel` is implemented as a custom step:
+  right-follow until both tunnel walls are visible and the steering is back at 80 degrees
+- `Drive Through Tunnel` is implemented as a custom step:
+  keep driving straight at 80 degrees once the light sensor drops below about 2400, then finish when it returns to ambient light at about 2600
 - the remaining steps still default to right wall follow for now
 - `STOP` brakes the motors
 - long press returns home
