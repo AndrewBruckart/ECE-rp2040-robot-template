@@ -10,13 +10,15 @@ static const float FRONT_TURN_DETECT_INCHES = 7.5f;
 static const float FRONT_BACKUP_DETECT_INCHES = 4.5f;
 static const float FRONT_BACKUP_CLEAR_INCHES = 4.75f;
 static const int NO_WALL_LEFT_STEERING_ANGLE = 50;
+static const int NO_WALL_RIGHT_STEERING_ANGLE = 130;
 static const int FRONT_TURN_STEER_DEG = 38;
 static const int BACKUP_STEER_DEG = 50;
 static const unsigned long BACKUP_DURATION_MS = 260;
 static const unsigned long POST_BACKUP_TURN_MS = 220;
 
 static const float DEFAULT_TARGET_DISTANCE_INCHES = 4.0f;
-static const float DEFAULT_KP = 12.0f;
+static const float DEFAULT_LEFT_KP = 12.0f;
+static const float DEFAULT_RIGHT_KP = 15.0f;
 static const int DEFAULT_MOTOR_SPEED_PERCENT = 100;
 
 static const float TARGET_DISTANCE_STEP = 0.5f;
@@ -27,13 +29,17 @@ static WallFollowSide selectedWall = WALL_SIDE_LEFT;
 static WallFollowState currentState = WALL_FOLLOW_STATE_TRACKING;
 static WallFollowTuning tuning = {
   DEFAULT_TARGET_DISTANCE_INCHES,
-  DEFAULT_KP,
+  DEFAULT_LEFT_KP,
   DEFAULT_MOTOR_SPEED_PERCENT
 };
 static unsigned long backupUntilMs = 0;
 static unsigned long postBackupTurnUntilMs = 0;
 static bool backupArmed = true;
 static bool backupEnabled = true;
+
+static float defaultKpForSide(WallFollowSide side) {
+  return (side == WALL_SIDE_RIGHT) ? DEFAULT_RIGHT_KP : DEFAULT_LEFT_KP;
+}
 
 static float clampFloat(float value, float minValue, float maxValue) {
   if (value < minValue) {
@@ -68,11 +74,8 @@ static int steeringOffsetToAngle(float steeringOffsetDegrees) {
 }
 
 static float noWallSeekOffsetDegrees() {
-  if (selectedWall == WALL_SIDE_RIGHT) {
-    return 0.0f;
-  }
-
-  return (float)(NO_WALL_LEFT_STEERING_ANGLE - STRAIGHT_STEERING_ANGLE);
+  int targetAngle = (selectedWall == WALL_SIDE_LEFT) ? NO_WALL_LEFT_STEERING_ANGLE : NO_WALL_RIGHT_STEERING_ANGLE;
+  return (float)(targetAngle - STRAIGHT_STEERING_ANGLE);
 }
 
 float wallFollowNoWallDistanceInches() {
@@ -83,7 +86,7 @@ void initWallFollow() {
   selectedWall = WALL_SIDE_LEFT;
   currentState = WALL_FOLLOW_STATE_TRACKING;
   tuning.targetWallDistanceInches = DEFAULT_TARGET_DISTANCE_INCHES;
-  tuning.kp = DEFAULT_KP;
+  tuning.kp = defaultKpForSide(selectedWall);
   tuning.motorSpeedPercent = DEFAULT_MOTOR_SPEED_PERCENT;
   backupUntilMs = 0;
   postBackupTurnUntilMs = 0;
@@ -170,7 +173,11 @@ bool isWallFollowBackupEnabled() {
 }
 
 void setWallFollowSide(WallFollowSide side) {
+  bool usingDefaultKp = fabsf(tuning.kp - defaultKpForSide(selectedWall)) < 0.001f;
   selectedWall = side;
+  if (usingDefaultKp) {
+    tuning.kp = defaultKpForSide(selectedWall);
+  }
   resetWallFollowController();
 }
 
@@ -193,6 +200,10 @@ const char *wallFollowStateName(WallFollowState state) {
     case WALL_FOLLOW_STATE_FRIENDS_FIND_WALL: return "FIND_WALL";
     case WALL_FOLLOW_STATE_FRIENDS_FOLLOW: return "FRIENDS_FOLLOW";
     case WALL_FOLLOW_STATE_FRIENDS_LOW_LIGHT: return "LOW_LIGHT";
+    case WALL_FOLLOW_STATE_TUNNEL_TURN: return "TUNNEL_TURN";
+    case WALL_FOLLOW_STATE_TUNNEL_FIND_WALL: return "TUNNEL_FIND";
+    case WALL_FOLLOW_STATE_TUNNEL_FOLLOW: return "TUNNEL_FOLLOW";
+    case WALL_FOLLOW_STATE_TUNNEL_STRAIGHT: return "TUNNEL_STRAIGHT";
     case WALL_FOLLOW_STATE_TRACKING:
     default:
       return "TRACK";
